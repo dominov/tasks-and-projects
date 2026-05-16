@@ -1,0 +1,59 @@
+{
+  "name": "app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:main\" \"npm:dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:main": "concurrently -k \"npm:dev:main:process\" \"npm:dev:preload\"",
+    "dev:main:process": "tsup src/main/main.ts --format esm --out-dir dist-electron --watch --sourcemap",
+    "dev:preload": "tsup src/main/preload.ts --format cjs --out-dir dist-electron --watch --sourcemap",
+    "dev:electron": "wait-on tcp:5173 file:dist-electron/main.js && electron dist-electron/main.js",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build",
+    "build:main": "npm run build:main:process && npm run build:preload",
+    "build:main:process": "tsup src/main/main.ts --format esm --out-dir dist-electron --sourcemap",
+    "build:preload": "tsup src/main/preload.ts --format cjs --out-dir dist-electron --sourcemap",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "db:migrate": "tsx src/database/migrate.ts",
+    "db:seed": "tsx src/database/seed.ts",
+    "package": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "electron": "^42.0.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.12.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.2",
+    "vite": "^8.0.12",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.personal.tasks",
+    "productName": "Personal Task Management",
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ]
+  }
+}
