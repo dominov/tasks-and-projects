@@ -1,6 +1,7 @@
 export type Priority = 1 | 2 | 3
 export type Recurrence = 'none' | 'weekly' | 'monthly'
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
+export type TaskType = 'task' | 'goal'
 
 export interface Project {
   id: number
@@ -39,6 +40,7 @@ export interface Task {
   status: TaskStatus
   start_time: string | null
   end_time: string | null
+  type: TaskType
 }
 
 export interface TaskWithRelations extends Task {
@@ -52,12 +54,14 @@ export interface TaskUpdatePayload {
   title?: string
   description?: string | null
   status?: TaskStatus
+  type?: TaskType
   priority?: Priority
   story_points?: number
   start_date?: string | null
   end_date?: string | null
   project_id?: number | null
   category_id?: number | null
+  parent_task_id?: number | null
   tag_ids?: number[]
   recurrence?: Recurrence
   recurrence_rule?: string | null
@@ -68,6 +72,7 @@ export interface TaskCreatePayload {
   title: string
   start_date?: string | null
   end_date?: string | null
+  type?: TaskType
   parent_task_id?: number | null
   project_id?: number | null
   category_id?: number | null

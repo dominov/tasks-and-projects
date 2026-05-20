@@ -7,6 +7,8 @@ interface CalendarViewProps {
 }
 
 function CalendarView({ tasks, onSelectTask, selectedTaskId }: CalendarViewProps) {
+  const calendarTasks = tasks.filter((task) => task.type !== 'goal')
+
   return (
     <section className="view-card">
       <header className="view-head">
@@ -14,7 +16,7 @@ function CalendarView({ tasks, onSelectTask, selectedTaskId }: CalendarViewProps
         <p>Lazy-loaded view scaffold ready for drag and drop scheduling.</p>
       </header>
       <div className="placeholder-grid">
-        {tasks.slice(0, 8).map((task) => (
+        {calendarTasks.slice(0, 8).map((task) => (
           <button
             key={task.id}
             type="button"

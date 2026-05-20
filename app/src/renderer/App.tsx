@@ -119,7 +119,7 @@ function App() {
   )
 
   const handleCreateTask = useCallback(
-    async (title: string) => {
+    async (title: string, type: 'task' | 'goal' = 'task') => {
       if (!title.trim()) {
         return
       }
@@ -127,6 +127,7 @@ function App() {
       try {
         await window.taskAppApi.createTask({
           title: title.trim(),
+          type,
           project_id: projectId,
           category_id: categoryId,
           tag_ids: tagId ? [tagId] : undefined,
@@ -138,6 +139,27 @@ function App() {
       }
     },
     [projectId, categoryId, tagId, refreshWorkspaceData, showBanner],
+  )
+
+  const handleCreateGoalSubtask = useCallback(
+    async (goalId: number, title: string) => {
+      if (!title.trim()) {
+        return
+      }
+
+      try {
+        await window.taskAppApi.createTask({
+          title: title.trim(),
+          type: 'task',
+          parent_task_id: goalId,
+        })
+        await refreshWorkspaceData()
+        showBanner('Subtask created for goal.', 'info')
+      } catch {
+        showBanner('Unable to create subtask for goal.', 'error')
+      }
+    },
+    [refreshWorkspaceData, showBanner],
   )
 
   const handleCreateProject = useCallback(
@@ -367,6 +389,7 @@ function App() {
             categoryId={categoryId}
             tagId={tagId}
             onCreateTask={handleCreateTask}
+            onCreateGoalSubtask={handleCreateGoalSubtask}
             onCreateProject={handleCreateProject}
             onCreateTag={handleCreateTag}
             onCreateCategory={handleCreateCategory}

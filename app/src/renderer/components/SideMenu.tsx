@@ -26,6 +26,7 @@ interface SideMenuProps {
 const viewMenu: Array<{ id: ViewType; label: string }> = [
   { id: 'today', label: 'Today' },
   { id: 'tasks', label: 'My Tasks' },
+  { id: 'goals', label: 'Goals' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'gantt', label: 'Gantt' },
 ]

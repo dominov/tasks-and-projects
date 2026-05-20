@@ -1,0 +1,2 @@
+-- Goal type column is added defensively from app startup in main/ensureTaskMetadataColumns.
+-- This migration remains intentionally empty because migrations are executed on every boot.

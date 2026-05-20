@@ -15,6 +15,7 @@ import type {
   TaskCreatePayload,
   TaskCreateResult,
   TaskStatus,
+  TaskType,
   TaskUpdatePayload,
   TaskWithRelations,
 } from '../common/types'
@@ -27,6 +28,7 @@ let mainWindow: BrowserWindow | null = null
 let db: AppDatabase | null = null
 
 const allowedStatuses: TaskStatus[] = ['todo', 'in_progress', 'done']
+const allowedTaskTypes: TaskType[] = ['task', 'goal']
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
@@ -79,6 +81,7 @@ function registerIpcHandlers(database: AppDatabase): void {
         t.status,
         t.start_time,
         t.end_time,
+        t.type,
         p.name AS project_name,
         c.name AS category_name,
         GROUP_CONCAT(DISTINCT tt.tag_id) AS tag_ids,
@@ -107,6 +110,8 @@ function registerIpcHandlers(database: AppDatabase): void {
     let statusChangedToDone = false
     let endDateChanged = false
     let dateDiffDays = 0
+    const previousParentTaskId = currentTask.parent_task_id
+    let nextParentTaskId = currentTask.parent_task_id
 
     if (typeof payload.title === 'string') {
       setClauses.push(`title = '${escapeSqlString(payload.title)}'`)
@@ -129,6 +134,14 @@ function registerIpcHandlers(database: AppDatabase): void {
       if (payload.status === 'done' && currentTask.status !== 'done') {
         statusChangedToDone = true
       }
+    }
+
+    if (payload.type !== undefined) {
+      if (!allowedTaskTypes.includes(payload.type)) {
+        throw new Error('Invalid task type')
+      }
+
+      setClauses.push(`type = '${payload.type}'`)
     }
 
     if (payload.priority !== undefined) {
@@ -181,6 +194,32 @@ function registerIpcHandlers(database: AppDatabase): void {
         }
 
         setClauses.push(`project_id = ${projectId}`)
+      }
+    }
+
+    if (payload.parent_task_id !== undefined) {
+      if (payload.parent_task_id === null) {
+        setClauses.push('parent_task_id = NULL')
+        nextParentTaskId = null
+      } else {
+        const parentTaskId = Number(payload.parent_task_id)
+
+        if (!Number.isInteger(parentTaskId) || parentTaskId <= 0) {
+          throw new Error('Invalid parent task value')
+        }
+
+        if (parentTaskId === taskId) {
+          throw new Error('A task cannot be its own parent')
+        }
+
+        const parentTask = database.first<{ id: number }>(`SELECT id FROM tasks WHERE id = ${parentTaskId} LIMIT 1;`)
+
+        if (!parentTask) {
+          throw new Error('Parent task not found')
+        }
+
+        setClauses.push(`parent_task_id = ${parentTaskId}`)
+        nextParentTaskId = parentTaskId
       }
     }
 
@@ -258,6 +297,24 @@ function registerIpcHandlers(database: AppDatabase): void {
     if (payload.recurrence && payload.recurrence !== 'none' && payload.recurrence_rule) {
        ensureIterations(database, taskId)
     }
+
+    if (currentTask.parent_task_id !== null) {
+      recalculateGoalBounds(database, currentTask.parent_task_id)
+    }
+
+    if (nextParentTaskId !== null && nextParentTaskId !== currentTask.parent_task_id) {
+      recalculateGoalBounds(database, nextParentTaskId)
+    }
+
+    if (nextParentTaskId !== previousParentTaskId && previousParentTaskId !== null) {
+      recalculateGoalBounds(database, previousParentTaskId)
+    }
+
+    const updatedTask = database.first<{ type: TaskType }>(`SELECT type FROM tasks WHERE id = ${taskId}`)
+
+    if (updatedTask?.type === 'goal') {
+      recalculateGoalBounds(database, taskId)
+    }
   })
 
   ipcMain.handle('tasks:delete', (_event, rawTaskId: number): void => {
@@ -269,6 +326,7 @@ function registerIpcHandlers(database: AppDatabase): void {
 
     const currentTask = database.first<TaskWithRelations>(`SELECT * FROM tasks WHERE id = ${taskId}`)
     if (!currentTask) return
+    const parentTaskId = currentTask.parent_task_id
 
     const prevId = currentTask.previous_recurrent_id
     const nextTask = database.first<TaskWithRelations>(`SELECT id FROM tasks WHERE previous_recurrent_id = ${taskId}`)
@@ -290,6 +348,10 @@ function registerIpcHandlers(database: AppDatabase): void {
         headId = p.previous_recurrent_id
       }
       ensureIterations(database, headId)
+    }
+
+    if (parentTaskId !== null) {
+      recalculateGoalBounds(database, parentTaskId)
     }
   })
 
@@ -333,6 +395,12 @@ function registerIpcHandlers(database: AppDatabase): void {
     }
 
     // Insert the task first
+    const taskType = payload.type ?? 'task'
+
+    if (!allowedTaskTypes.includes(taskType)) {
+      throw new Error('Invalid task type')
+    }
+
     database.execute(`
       INSERT INTO tasks (
         title,
@@ -350,7 +418,8 @@ function registerIpcHandlers(database: AppDatabase): void {
         previous_recurrent_id,
         status,
         start_time,
-        end_time
+        end_time,
+        type
       ) VALUES (
         '${escapeSqlString(title)}',
         NULL,
@@ -367,7 +436,8 @@ function registerIpcHandlers(database: AppDatabase): void {
         ${payload.previous_recurrent_id === undefined || payload.previous_recurrent_id === null ? 'NULL' : Number(payload.previous_recurrent_id)},
         'todo',
         NULL,
-        NULL
+        NULL,
+        '${taskType}'
       );
     `)
 
@@ -381,6 +451,14 @@ function registerIpcHandlers(database: AppDatabase): void {
 
     if (payload.recurrence && payload.recurrence !== 'none' && payload.recurrence_rule) {
       ensureIterations(database, taskId)
+    }
+
+    if (payload.parent_task_id !== undefined && payload.parent_task_id !== null) {
+      recalculateGoalBounds(database, Number(payload.parent_task_id))
+    }
+
+    if (taskType === 'goal') {
+      recalculateGoalBounds(database, taskId)
     }
 
     // Add tags if provided
@@ -553,12 +631,18 @@ function buildTaskDeletionStatements(taskFilterSql: string): string[] {
 function ensureTaskMetadataColumns(database: AppDatabase): void {
   const columns = database.query<{ name: string }>('PRAGMA table_info(tasks);')
   const hasCreatedAtColumn = columns.some((column) => column.name === 'created_at')
+  const hasTypeColumn = columns.some((column) => column.name === 'type')
 
   if (!hasCreatedAtColumn) {
     database.execute('ALTER TABLE tasks ADD COLUMN created_at TEXT;')
   }
 
+  if (!hasTypeColumn) {
+    database.execute("ALTER TABLE tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'task' CHECK(type IN ('task', 'goal'));")
+  }
+
   database.execute("UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL;")
+  database.execute("UPDATE tasks SET type = 'task' WHERE type IS NULL OR type NOT IN ('task', 'goal');")
 }
 
 function escapeSqlString(value: string): string {
@@ -726,6 +810,32 @@ function handleChainShift(database: AppDatabase, taskId: number, dateDiffDays: n
     database.transaction(statements)
     handleChainShift(database, nextTask.id, dateDiffDays)
   }
+}
+
+function recalculateGoalBounds(database: AppDatabase, taskId: number): void {
+  const parentTask = database.first<{ id: number; type: TaskType }>(
+    `SELECT id, type FROM tasks WHERE id = ${taskId} LIMIT 1;`,
+  )
+
+  if (!parentTask || parentTask.type !== 'goal') {
+    return
+  }
+
+  const bounds = database.first<{ min_start_date: string | null; max_end_date: string | null }>(`
+    SELECT
+      MIN(start_date) AS min_start_date,
+      MAX(end_date) AS max_end_date
+    FROM tasks
+    WHERE parent_task_id = ${taskId};
+  `)
+
+  database.execute(`
+    UPDATE tasks
+    SET
+      start_date = ${bounds?.min_start_date ? `'${escapeSqlString(bounds.min_start_date)}'` : 'NULL'},
+      end_date = ${bounds?.max_end_date ? `'${escapeSqlString(bounds.max_end_date)}'` : 'NULL'}
+    WHERE id = ${taskId};
+  `)
 }
 
 // --- End Helpers ---

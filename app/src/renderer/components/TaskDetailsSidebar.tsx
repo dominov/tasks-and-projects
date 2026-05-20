@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState, type RefObject } from 'react'
 import type {
   Category,
   Project,
+  Recurrence,
   Tag,
   TaskCreatePayload,
   TaskStatus,
+  TaskType,
   TaskUpdatePayload,
   TaskWithRelations,
 } from '../../common/types'
@@ -13,6 +15,7 @@ interface TaskDraft {
   title: string
   description: string
   status: TaskStatus
+  type: TaskType
   priority: number
   storyPoints: number
   startDate: string
@@ -43,6 +46,7 @@ function createEmptyDraft(): TaskDraft {
     title: '',
     description: '',
     status: 'todo',
+    type: 'task',
     priority: 2,
     storyPoints: 1,
     startDate: '',
@@ -97,6 +101,7 @@ function TaskDetailsSidebar({
       title: selectedTask.title,
       description: selectedTask.description ?? '',
       status: selectedTask.status,
+      type: selectedTask.type,
       priority: selectedTask.priority,
       storyPoints: selectedTask.story_points,
       startDate: selectedTask.start_date ?? '',
@@ -201,6 +206,14 @@ function TaskDetailsSidebar({
     }
 
     void persistUpdate({ priority: value as 1 | 2 | 3 }, 'Priority updated.')
+  }
+
+  function maybeCommitType(value: TaskType): void {
+    if (!selectedTask || selectedTask.type === value) {
+      return
+    }
+
+    void persistUpdate({ type: value }, 'Task type updated.')
   }
 
   function maybeCommitStartDate(value: string): void {
@@ -321,39 +334,22 @@ function TaskDetailsSidebar({
             </div>
 
             {showSubtaskCreator && (
-              <table className="subtask-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Date</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <input
-                        value={subtaskTitle}
-                        onChange={(event) => setSubtaskTitle(event.target.value)}
-                        placeholder="Subtask name"
-                      />
-                    </td>
-                    <td>
-                      <input type="date" value={subtaskDate} onChange={(event) => setSubtaskDate(event.target.value)} />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="subtask-add"
-                        onClick={() => void handleCreateSubtaskClick()}
-                        disabled={!subtaskTitle.trim() || creatingSubtask}
-                      >
-                        ADD
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className="subtask-form" role="group" aria-label="Create subtask">
+                <input
+                  value={subtaskTitle}
+                  onChange={(event) => setSubtaskTitle(event.target.value)}
+                  placeholder="Subtask name"
+                />
+                <input type="date" value={subtaskDate} onChange={(event) => setSubtaskDate(event.target.value)} />
+                <button
+                  type="button"
+                  className="subtask-add"
+                  onClick={() => void handleCreateSubtaskClick()}
+                  disabled={!subtaskTitle.trim() || creatingSubtask}
+                >
+                  ADD
+                </button>
+              </div>
             )}
 
             <label className="field-row">
@@ -416,6 +412,21 @@ function TaskDetailsSidebar({
             </label>
 
             <label className="field-row">
+              <span className="field-label">Type:</span>
+              <select
+                value={draft.type}
+                onChange={(event) => {
+                  const nextType = event.target.value as TaskType
+                  setDraft((current) => ({ ...current, type: nextType }))
+                }}
+                onBlur={(event) => maybeCommitType(event.target.value as TaskType)}
+              >
+                <option value="task">Task</option>
+                <option value="goal">Goal</option>
+              </select>
+            </label>
+
+            <label className="field-row">
               <span className="field-label">Priority:</span>
               <select
                 value={draft.priority}
@@ -461,6 +472,7 @@ function TaskDetailsSidebar({
               <input
                 type="date"
                 value={draft.startDate}
+                disabled={draft.type === 'goal'}
                 onChange={(event) => {
                   const nextStartDate = event.target.value
                   setDraft((current) => ({ ...current, startDate: nextStartDate }))
@@ -474,6 +486,7 @@ function TaskDetailsSidebar({
               <input
                 type="date"
                 value={draft.endDate}
+                disabled={draft.type === 'goal'}
                 onChange={(event) => {
                   const nextEndDate = event.target.value
                   setDraft((current) => ({ ...current, endDate: nextEndDate }))
@@ -481,6 +494,10 @@ function TaskDetailsSidebar({
                 onBlur={(event) => maybeCommitDueDate(event.target.value)}
               />
             </label>
+
+            {draft.type === 'goal' && (
+              <p className="muted">Goal dates are calculated automatically from its subtasks.</p>
+            )}
 
             <label className="field-row">
               <span className="field-label">Recurrence:</span>

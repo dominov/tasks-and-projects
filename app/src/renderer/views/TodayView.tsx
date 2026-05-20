@@ -10,8 +10,9 @@ interface TodayViewProps {
 
 function TodayView({ tasks, onSelectTask, selectedTaskId }: TodayViewProps) {
   const today = new Date().toISOString().slice(0, 10)
-  const overdue = tasks.filter((task) => task.status !== 'done' && !!task.end_date && task.end_date < today)
-  const dueToday = tasks.filter((task) => task.status !== 'done' && task.end_date === today)
+  const activeTasks = tasks.filter((task) => task.type !== 'goal')
+  const overdue = activeTasks.filter((task) => task.status !== 'done' && !!task.end_date && task.end_date < today)
+  const dueToday = activeTasks.filter((task) => task.status !== 'done' && task.end_date === today)
 
   const [groupBy, setGroupBy] = useState<GroupBy>('status')
 
