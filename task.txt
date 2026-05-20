@@ -1,22 +1,13 @@
-Update My Tasks view:
-
-3.1. The table must be interactive:
-
-a:
-
+- remove Add task buttoms 
 b: Table cells should allow modification of each task parameter. For example, double-clicking the header should enable the text field. Double-clicking the task's project should display the project list for modification. Clicking the category should display the category list for modification, and so on. The End Date field should display a calendar.
 
-
-
-
-3.2.
-
-3.3. We must group the tasks. There should be a selector to choose the grouping criteria: Category, Project, or Status.
-
-If I update a task and change the project, it should change its group.
 
 - permitir hacer click derecho en la tarea y abrir menu contextual: 
     - Cambiar status a Done
     - duplicar tarea
     - Eliminar tarea
+    -conertir en Sub task : debe mostrar un desplegable de tareas que este en to-do
+         o in proceso . o combertir a tarea si ya es subtarea
+
+
 

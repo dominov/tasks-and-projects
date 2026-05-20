@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo', 'in_progress', 'done')),
   start_time TEXT,
   end_time TEXT,
+  previous_recurrent_id INTEGER,
+  recurrence_rule TEXT,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
   FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL

@@ -21,7 +21,12 @@ function CalendarView({ tasks, onSelectTask, selectedTaskId }: CalendarViewProps
             className={selectedTaskId === task.id ? 'task-pill active' : 'task-pill'}
             onClick={() => onSelectTask(task.id)}
           >
-            <strong>{task.title}</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <strong>{task.title}</strong>
+              {task.recurrence !== 'none' && (
+                <span title={`Recurring: ${task.recurrence}`}>🔄</span>
+              )}
+            </div>
             <span>{task.start_date ?? 'No start'} - {task.end_date ?? 'No end'}</span>
           </button>
         ))}

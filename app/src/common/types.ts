@@ -34,6 +34,8 @@ export interface Task {
   category_id: number | null
   parent_task_id: number | null
   recurrence: Recurrence
+  recurrence_rule: string | null
+  previous_recurrent_id: number | null
   status: TaskStatus
   start_time: string | null
   end_time: string | null
@@ -52,19 +54,27 @@ export interface TaskUpdatePayload {
   status?: TaskStatus
   priority?: Priority
   story_points?: number
+  start_date?: string | null
   end_date?: string | null
   project_id?: number | null
   category_id?: number | null
   tag_ids?: number[]
+  recurrence?: Recurrence
+  recurrence_rule?: string | null
+  previous_recurrent_id?: number | null
 }
 
 export interface TaskCreatePayload {
   title: string
+  start_date?: string | null
   end_date?: string | null
   parent_task_id?: number | null
   project_id?: number | null
   category_id?: number | null
   tag_ids?: number[]
+  recurrence?: Recurrence
+  recurrence_rule?: string | null
+  previous_recurrent_id?: number | null
 }
 
 export interface TaskCreateResult {

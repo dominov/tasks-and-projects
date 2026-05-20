@@ -1,0 +1,2 @@
+-- Recurrence columns (previous_recurrent_id, recurrence_rule) are now in the initial schema (001_initial_schema.sql)
+-- This migration is kept as a placeholder for future recurrence-related updates.

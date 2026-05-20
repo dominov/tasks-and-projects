@@ -11,7 +11,6 @@ interface SideMenuProps {
   selectedTagId: number | null
   selectedCategoryId: number | null
   onChangeView: (view: ViewType) => void
-  onAddTask: () => void
   onToggleCompletedTasks: (showCompleted: boolean) => void
   onSelectProject: (projectId: number | null) => void
   onSelectTag: (tagId: number | null) => void
@@ -42,7 +41,6 @@ function SideMenu({
   selectedTagId,
   selectedCategoryId,
   onChangeView,
-  onAddTask,
   onToggleCompletedTasks,
   onSelectProject,
   onSelectTag,
@@ -57,10 +55,6 @@ function SideMenu({
   return (
     <aside className="side-menu">
       <div className="menu-top">
-        <button className="add-task" type="button" data-details-trigger="open" onClick={onAddTask}>
-          Add Task
-        </button>
-
         <nav aria-label="Main views">
           {viewMenu.map((item) => (
             <button

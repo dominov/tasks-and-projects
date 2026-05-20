@@ -15,10 +15,13 @@ interface TaskDraft {
   status: TaskStatus
   priority: number
   storyPoints: number
+  startDate: string
   endDate: string
   projectId: number | null
   categoryId: number | null
   tagIds: number[]
+  recurrence: Recurrence
+  recurrenceRule: string | null
 }
 
 interface TaskDetailsSidebarProps {
@@ -42,10 +45,13 @@ function createEmptyDraft(): TaskDraft {
     status: 'todo',
     priority: 2,
     storyPoints: 1,
+    startDate: '',
     endDate: '',
     projectId: null,
     categoryId: null,
     tagIds: [],
+    recurrence: 'none',
+    recurrenceRule: null,
   }
 }
 
@@ -93,10 +99,13 @@ function TaskDetailsSidebar({
       status: selectedTask.status,
       priority: selectedTask.priority,
       storyPoints: selectedTask.story_points,
+      startDate: selectedTask.start_date ?? '',
       endDate: selectedTask.end_date ?? '',
       projectId: selectedTask.project_id,
       categoryId: selectedTask.category_id,
       tagIds: parseTagIds(selectedTask.tag_ids),
+      recurrence: selectedTask.recurrence,
+      recurrenceRule: selectedTask.recurrence_rule,
     })
     setShowSubtaskCreator(false)
     setSubtaskTitle('')
@@ -192,6 +201,20 @@ function TaskDetailsSidebar({
     }
 
     void persistUpdate({ priority: value as 1 | 2 | 3 }, 'Priority updated.')
+  }
+
+  function maybeCommitStartDate(value: string): void {
+    if (!selectedTask) {
+      return
+    }
+
+    const nextStartDate = value || null
+
+    if ((selectedTask.start_date ?? null) === nextStartDate) {
+      return
+    }
+
+    void persistUpdate({ start_date: nextStartDate }, 'Start date updated.')
   }
 
   function maybeCommitDueDate(value: string): void {
@@ -434,6 +457,19 @@ function TaskDetailsSidebar({
             </label>
 
             <label className="field-row">
+              <span className="field-label">Start Date:</span>
+              <input
+                type="date"
+                value={draft.startDate}
+                onChange={(event) => {
+                  const nextStartDate = event.target.value
+                  setDraft((current) => ({ ...current, startDate: nextStartDate }))
+                }}
+                onBlur={(event) => maybeCommitStartDate(event.target.value)}
+              />
+            </label>
+
+            <label className="field-row">
               <span className="field-label">Due Date:</span>
               <input
                 type="date"
@@ -445,6 +481,81 @@ function TaskDetailsSidebar({
                 onBlur={(event) => maybeCommitDueDate(event.target.value)}
               />
             </label>
+
+            <label className="field-row">
+              <span className="field-label">Recurrence:</span>
+              <select
+                value={draft.recurrence}
+                onChange={(event) => {
+                  const nextValue = event.target.value as Recurrence
+                  setDraft((current) => ({ ...current, recurrence: nextValue }))
+                  if (nextValue === 'none') {
+                    void persistUpdate({ recurrence: 'none', recurrence_rule: null }, 'Recurrence removed.')
+                  }
+                }}
+              >
+                <option value="none">None</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </label>
+
+            {draft.recurrence === 'weekly' && (
+              <fieldset className="recurrence-fieldset">
+                <legend>Weekly Days</legend>
+                <div className="days-selector">
+                  {[
+                    { label: 'Mon', value: 1 },
+                    { label: 'Tue', value: 2 },
+                    { label: 'Wed', value: 3 },
+                    { label: 'Thu', value: 4 },
+                    { label: 'Fri', value: 5 },
+                    { label: 'Sat', value: 6 },
+                    { label: 'Sun', value: 0 },
+                  ].map((day) => (
+                    <label key={day.value} className="day-toggle">
+                      <input
+                        type="checkbox"
+                        checked={(draft.recurrenceRule ?? '').split(',').includes(day.value.toString())}
+                        onChange={(event) => {
+                          const currentDays = (draft.recurrenceRule ?? '').split(',').filter(Boolean)
+                          const nextDays = event.target.checked
+                            ? [...currentDays, day.value.toString()]
+                            : currentDays.filter((d) => d !== day.value.toString())
+                          const rule = nextDays.sort().join(',')
+                          setDraft((current) => ({ ...current, recurrenceRule: rule }))
+                          void persistUpdate({ recurrence: 'weekly', recurrence_rule: rule }, 'Weekly recurrence updated.')
+                        }}
+                      />
+                      <span>{day.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+
+            {draft.recurrence === 'monthly' && (
+              <label className="field-row">
+                <span className="field-label">Day of Month:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={draft.recurrenceRule ?? ''}
+                  onChange={(event) => {
+                    const rule = event.target.value
+                    setDraft((current) => ({ ...current, recurrenceRule: rule }))
+                  }}
+                  onBlur={(event) => {
+                    const rule = event.target.value
+                    if (rule) {
+                      void persistUpdate({ recurrence: 'monthly', recurrence_rule: rule }, 'Monthly recurrence updated.')
+                    }
+                  }}
+                  placeholder="1-31"
+                />
+              </label>
+            )}
 
             <fieldset className="tags-fieldset">
               <legend>Tags</legend>

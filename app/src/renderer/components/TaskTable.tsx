@@ -1,5 +1,11 @@
-import { useState, type ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import type { TaskWithRelations } from '../../common/types'
+import {
+  buildTaskTree,
+  groupTasks,
+  type GroupBy,
+  type TaskNode,
+} from '../utils/taskGrouping'
 
 type SortField = 'title' | 'project' | 'category' | 'priority' | 'story_points' | 'status' | 'end_date'
 
@@ -16,6 +22,7 @@ interface TaskTableProps {
 function TaskTable({ tasks, onSelectTask, selectedTaskId, projectId, categoryId, tagId, onCreateTask }: TaskTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortAsc, setSortAsc] = useState(true)
+  const [groupBy, setGroupBy] = useState<GroupBy>('category')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [creatingTask, setCreatingTask] = useState(false)
 
@@ -30,6 +37,14 @@ function TaskTable({ tasks, onSelectTask, selectedTaskId, projectId, categoryId,
 
   const sortedTasks = getSortedTasks(tasks, sortField, sortAsc)
   const taskTree = buildTaskTree(sortedTasks)
+  const groupedTaskTree = groupTasks(taskTree, groupBy)
+
+  const groupOptions: Array<{ value: GroupBy; label: string }> = [
+    { value: 'category', label: 'Category' },
+    { value: 'project', label: 'Project' },
+    { value: 'status', label: 'Status' },
+    { value: 'priority', label: 'Priority' },
+  ]
 
   async function handleCreateNewTask(): Promise<void> {
     if (!newTaskTitle.trim()) {
@@ -54,6 +69,20 @@ function TaskTable({ tasks, onSelectTask, selectedTaskId, projectId, categoryId,
 
   return (
     <div className="table-wrap">
+      <div className="table-toolbar">
+        <label htmlFor="group-by-select">Group by:</label>
+        <select
+          id="group-by-select"
+          value={groupBy}
+          onChange={(event) => setGroupBy(event.target.value as GroupBy)}
+        >
+          {groupOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <table>
         <thead>
           <tr>
@@ -108,48 +137,23 @@ function TaskTable({ tasks, onSelectTask, selectedTaskId, projectId, categoryId,
               </button>
             </td>
           </tr>
-          {taskTree.map((node) => renderTaskRow(node, 0, selectedTaskId, onSelectTask))}
+          {groupedTaskTree.map((section) => (
+            <Fragment key={`${section.groupBy}-${section.groupLabel}`}>
+              <tr className="group-row">
+                <td colSpan={8}>
+                  <strong>{section.groupTitle}</strong>
+                </td>
+              </tr>
+              {section.nodes.flatMap((node) => renderTaskRow(node, 0, selectedTaskId, onSelectTask))}
+            </Fragment>
+          ))}
         </tbody>
       </table>
     </div>
   )
 }
 
-interface TaskNode {
-  task: TaskWithRelations
-  children: TaskNode[]
-  orderIndex: number
-}
 
-function buildTaskTree(tasks: TaskWithRelations[]): TaskNode[] {
-  const nodeById = new Map<number, TaskNode>()
-  const childMap = new Map<number, TaskNode[]>()
-  const roots: TaskNode[] = []
-
-  tasks.forEach((task, orderIndex) => {
-    nodeById.set(task.id, { task, children: [], orderIndex })
-  })
-
-  for (const node of nodeById.values()) {
-    const parentKey = node.task.parent_task_id
-
-    if (parentKey === null || !nodeById.has(parentKey)) {
-      roots.push(node)
-    } else {
-      const siblings = childMap.get(parentKey) ?? []
-      siblings.push(node)
-      childMap.set(parentKey, siblings)
-    }
-  }
-
-  const sortByOrder = (left: TaskNode, right: TaskNode) => left.orderIndex - right.orderIndex
-
-  for (const node of nodeById.values()) {
-    node.children = (childMap.get(node.task.id) ?? []).sort(sortByOrder)
-  }
-
-  return roots.sort(sortByOrder)
-}
 
 function renderTaskRow(
   node: TaskNode,
@@ -170,6 +174,11 @@ function renderTaskRow(
       <td className={isSubtask ? 'task-title-cell task-title-cell--subtask' : 'task-title-cell'}>
         {isSubtask && <span className="task-subtask-marker" aria-hidden="true">↳</span>}
         <span>{task.title}</span>
+        {task.recurrence !== 'none' && (
+          <span className="recurrence-icon" title={`Recurring: ${task.recurrence}`}>
+            🔄
+          </span>
+        )}
         {isSubtask && <span className="task-subtask-badge">Subtask</span>}
       </td>
       <td>{task.project_name ?? '-'}</td>

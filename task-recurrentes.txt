@@ -1,0 +1,25 @@
+Recurring tasks context:
+You must allow a task to run weekly (every Monday, Tuesday, Wednesday, etc.) or monthly (every single day of the month).
+
+- When a task is marked as recurring, four upcoming tasks will be created (as a preview so you know which recurring tasks are coming up when you check your calendar). These will be linked to the previous one; that is, if the previous task's completion date changes, the tasks that depend on it must also change.
+- If a task is marked as completed, the linked task breaks its link, and a new task is added to the end of the row.
+
+Tasks:
+1: User Interface and Rule Selector (Right Panel)
+Add a recurrence selector in the Side Panel: None, Weekly (allowing you to select specific days: Mon, Tue, Wed, Thu, Fri, Sat, Sun), and Monthly (for the exact day of the month).
+
+Icon Indicator: If the task is recurring, render a native icon (e.g., from Lucide React, such as Repeat or RefreshCw) next to the title in the Table View, TODAY View, and Calendar View.
+
+2: Initial Generation Algorithm (Lookahead)
+When saving a recurring task for the first time, the system should calculate the next four valid dates according to the rule (Weekly or Monthly), respecting the exclusion of weekends and holidays that we defined previously.
+Insert these four tasks into the database in a to-do state, linked sequentially using the previous_recurrent_id column.
+
+3: Semantic Chain Shift Logic
+Create a listener in SQLite/Node.js: If Task 1 in the series changes its end_date, the system should calculate the difference in days and proportionally push the start and end dates of Tasks 2, 3, and 4, which are queued behind it.
+
+4: Completion Flow (Decoupling and Appending)
+When the user marks Task 1 as Completed (status = 'done'):
+Break link: Update Task 2 by changing its previous_recurrent_id to NULL (it becomes independent and will no longer be moved if you reopen Task 1).
+Append to end: Calculate the date of the 5th iteration based on the date of Task 4 and create a new record at the end of the queue to always keep all 4 previews active on the calendar.
+
+If you delete Task 2 from the series instead of completing it, the system should readjust the links by joining Task 1 directly with Task 3 and generating a new one at the end so as not to lose the window for Task 4.

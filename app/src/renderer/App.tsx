@@ -332,7 +332,6 @@ function App() {
         selectedTagId={tagId}
         selectedCategoryId={categoryId}
         onChangeView={setViewType}
-        onAddTask={handleAddTask}
         onToggleCompletedTasks={setShowCompletedTasks}
         onSelectProject={setProjectId}
         onSelectTag={setTagId}
