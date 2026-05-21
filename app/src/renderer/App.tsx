@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppBanner from './components/AppBanner'
 import SideMenu from './components/SideMenu'
 import TaskDetailsSidebar from './components/TaskDetailsSidebar'
-import ViewManager, { type ViewType } from './components/ViewManager'
+import ViewManager, { type QuickCreateOptions, type ViewType } from './components/ViewManager'
 import { useBanner } from './hooks/useBanner'
 import { useWorkspaceData } from './hooks/useWorkspaceData'
 import type { TaskCreatePayload, TaskUpdatePayload } from '../common/types'
@@ -54,11 +54,6 @@ function App() {
 
   function handleSelectTask(taskId: number): void {
     setSelectedTaskId(taskId)
-    setDetailsOpen(true)
-  }
-
-  function handleAddTask(): void {
-    setSelectedTaskId(null)
     setDetailsOpen(true)
   }
 
@@ -119,19 +114,32 @@ function App() {
   )
 
   const handleCreateTask = useCallback(
-    async (title: string, type: 'task' | 'goal' = 'task') => {
+    async (title: string, type: 'task' | 'goal' = 'task', options?: QuickCreateOptions) => {
       if (!title.trim()) {
         return
       }
 
       try {
-        await window.taskAppApi.createTask({
+        const projectValue = options?.projectId !== undefined ? options.projectId : projectId
+        const createResult = await window.taskAppApi.createTask({
           title: title.trim(),
           type,
-          project_id: projectId,
+          end_date: options?.endDate ?? null,
+          project_id: projectValue,
           category_id: categoryId,
           tag_ids: tagId ? [tagId] : undefined,
         })
+
+        if (options?.priority) {
+          const createdTaskIdRaw = (createResult as { taskId?: unknown; taskid?: unknown }).taskId
+            ?? (createResult as { taskId?: unknown; taskid?: unknown }).taskid
+          const createdTaskId = Number(createdTaskIdRaw)
+
+          if (Number.isInteger(createdTaskId) && createdTaskId > 0) {
+            await window.taskAppApi.updateTask(createdTaskId, { priority: options.priority })
+          }
+        }
+
         await refreshWorkspaceData()
         showBanner('Task created.', 'info')
       } catch {
@@ -372,9 +380,6 @@ function App() {
             <p className="eyebrow">View Manager</p>
             <h1>Personal Task Management</h1>
           </div>
-          <button type="button" className="add-task" data-details-trigger="open" onClick={handleAddTask}>
-            Add Task
-          </button>
         </header>
 
         {loading && <p>Loading workspace data...</p>}
@@ -383,6 +388,7 @@ function App() {
           <ViewManager
             viewType={viewType}
             tasks={displayedTasks}
+            projects={projects}
             onSelectTask={handleSelectTask}
             selectedTaskId={selectedTask?.id ?? null}
             projectId={projectId}

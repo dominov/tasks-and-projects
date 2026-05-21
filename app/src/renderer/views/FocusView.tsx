@@ -1,0 +1,417 @@
+import { useMemo, useState } from 'react'
+import { format, isToday, isTomorrow, isThisWeek } from 'date-fns'
+import type { Project, TaskWithRelations } from '../../common/types'
+
+type SortBy = 'priority' | 'project' | 'story_points'
+
+interface FocusViewProps {
+  tasks: TaskWithRelations[]
+  projects: Project[]
+  onSelectTask: (taskId: number) => void
+  selectedTaskId: number | null
+}
+
+function getNextBusinessDay(today: Date): string {
+  const day = today.getDay()
+  const daysToAdd = day === 5 ? 3 : day === 6 ? 2 : 1
+  const next = new Date(today)
+  next.setDate(next.getDate() + daysToAdd)
+  return next.toISOString().slice(0, 10)
+}
+
+function formatCurrentDate(): string {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+function getCategoryIcon(categoryName: string | null): string {
+  if (!categoryName) return 'folder'
+  const lower = categoryName.toLowerCase()
+  if (lower.includes('report')) return 'bar-chart-3'
+  if (lower.includes('develop') || lower.includes('dev')) return 'code-xml'
+  if (lower.includes('design')) return 'palette'
+  if (lower.includes('test')) return 'flask'
+  if (lower.includes('doc')) return 'file-text'
+  if (lower.includes('bug') || lower.includes('fix')) return 'bug'
+  if (lower.includes('meeting') || lower.includes('sync')) return 'users'
+  return 'folder'
+}
+
+function sortTasks(tasks: TaskWithRelations[], sortBy: SortBy): TaskWithRelations[] {
+  return [...tasks].sort((a, b) => {
+    if (sortBy === 'priority') return b.priority - a.priority
+    if (sortBy === 'story_points') return b.story_points - a.story_points
+    if (sortBy === 'project') {
+      const pa = a.project_name ?? ''
+      const pb = b.project_name ?? ''
+      return pa.localeCompare(pb)
+    }
+    return 0
+  })
+}
+
+function formatFriendlyDate(dateString: string | null): string {
+  if (!dateString) return '-'
+
+  const [year, month, day] = dateString.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  if (isToday(date)) return 'Today'
+  if (isTomorrow(date)) return 'Tomorrow'
+  if (isThisWeek(date)) return format(date, 'EEEE')
+
+  return format(date, 'd MMM')
+}
+
+function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewProps) {
+  const [sortBy, setSortBy] = useState<SortBy>('priority')
+  const today = new Date().toISOString().slice(0, 10)
+  const nextBusinessDay = getNextBusinessDay(new Date())
+
+  const activeTasks = useMemo(
+    () => tasks.filter((t) => t.type !== 'goal'),
+    [tasks],
+  )
+
+  const todayTasks = useMemo(
+    () => activeTasks.filter((t) => t.end_date === today),
+    [activeTasks, today],
+  )
+
+  const overdueTasks = useMemo(
+    () => activeTasks.filter((t) => t.status !== 'done' && !!t.end_date && t.end_date < today),
+    [activeTasks, today],
+  )
+
+  const tomorrowTasks = useMemo(
+    () => activeTasks.filter((t) => t.end_date === nextBusinessDay),
+    [activeTasks, nextBusinessDay],
+  )
+
+  const todoToday = useMemo(
+    () => sortTasks(todayTasks.filter((t) => t.status === 'todo'), sortBy),
+    [todayTasks, sortBy],
+  )
+
+  const inProgressToday = useMemo(
+    () => sortTasks(todayTasks.filter((t) => t.status === 'in_progress'), sortBy),
+    [todayTasks, sortBy],
+  )
+
+  const doneToday = useMemo(
+    () => sortTasks(todayTasks.filter((t) => t.status === 'done'), sortBy),
+    [todayTasks, sortBy],
+  )
+
+  const sortedOverdue = useMemo(
+    () => sortTasks(overdueTasks, sortBy),
+    [overdueTasks, sortBy],
+  )
+
+  const projectColorMap = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const p of projects) {
+      map.set(p.id, p.color)
+    }
+    return map
+  }, [projects])
+
+  return (
+    <div className="focus-view">
+      {/* Header */}
+      <header className="focus-header">
+        <div className="focus-header__left">
+          <h1 className="focus-header__title">
+            <ZapIcon />
+            My Workday
+          </h1>
+          <p className="focus-header__date">{formatCurrentDate()}</p>
+        </div>
+        <div className="focus-header__right">
+          <label className="focus-sort-label" htmlFor="focus-sort">Sort by</label>
+          <select
+            id="focus-sort"
+            className="focus-sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+          >
+            <option value="priority">Priority</option>
+            <option value="project">Project</option>
+            <option value="story_points">Story Points</option>
+          </select>
+        </div>
+      </header>
+
+      {/* Scrollable content */}
+      <div className="focus-scroll">
+        {/* BOX 1: Today's Priorities */}
+        <section className="focus-box focus-box--today">
+          <h2 className="focus-box__title">Priorities for Today</h2>
+          <div className="focus-kanban">
+            {/* To Do */}
+            <div className="focus-kanban__col">
+              <div className="focus-kanban__col-header">
+                <CircleIcon />
+                <span>TO DO</span>
+              </div>
+              <div className="focus-kanban__col-body">
+                {todoToday.length === 0 && <EmptyState text="All clear" />}
+                {todoToday.map((task) => (
+                  <FocusCard
+                    key={task.id}
+                    task={task}
+                    selected={selectedTaskId === task.id}
+                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                    onSelect={onSelectTask}
+                  />
+                ))}
+              </div>
+              <div className="focus-kanban__col-count">{todoToday.length}</div>
+            </div>
+
+            {/* In Progress */}
+            <div className="focus-kanban__col">
+              <div className="focus-kanban__col-header focus-kanban__col-header--progress">
+                <ProgressIcon />
+                <span>IN PROGRESS</span>
+              </div>
+              <div className="focus-kanban__col-body">
+                {inProgressToday.length === 0 && <EmptyState text="Nothing running" />}
+                {inProgressToday.map((task) => (
+                  <FocusCard
+                    key={task.id}
+                    task={task}
+                    selected={selectedTaskId === task.id}
+                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                    onSelect={onSelectTask}
+                    showPulse
+                  />
+                ))}
+              </div>
+              <div className="focus-kanban__col-count">{inProgressToday.length}</div>
+            </div>
+
+            {/* Done */}
+            <div className="focus-kanban__col">
+              <div className="focus-kanban__col-header focus-kanban__col-header--done">
+                <CheckIcon />
+                <span>DONE</span>
+              </div>
+              <div className="focus-kanban__col-body">
+                {doneToday.length === 0 && <EmptyState text="Complete tasks to see them here" />}
+                {doneToday.map((task) => (
+                  <FocusCard
+                    key={task.id}
+                    task={task}
+                    selected={selectedTaskId === task.id}
+                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                    onSelect={onSelectTask}
+                  />
+                ))}
+              </div>
+              <div className="focus-kanban__col-count">{doneToday.length}</div>
+            </div>
+          </div>
+        </section>
+
+        {/* BOX 2: Overdue */}
+        {sortedOverdue.length > 0 && (
+          <section className="focus-box focus-box--overdue">
+            <h2 className="focus-box__title focus-box__title--overdue">
+              <AlertIcon />
+              Overdue Tasks
+            </h2>
+            <div className="focus-overdue-list">
+              {sortedOverdue.map((task) => (
+                <FocusCard
+                  key={task.id}
+                  task={task}
+                  selected={selectedTaskId === task.id}
+                  projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                  onSelect={onSelectTask}
+                  overdue
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* BOX 3: Next Business Day */}
+        <section className="focus-box focus-box--tomorrow">
+          <h2 className="focus-box__title focus-box__title--tomorrow">Next Business Day</h2>
+          <div className="focus-tomorrow-list">
+            {tomorrowTasks.length === 0 && <EmptyState text="No tasks scheduled" />}
+            {tomorrowTasks.map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                data-details-trigger="open"
+                className={`focus-tomorrow-item${selectedTaskId === task.id ? ' focus-tomorrow-item--active' : ''}`}
+                onClick={() => onSelectTask(task.id)}
+              >
+                <span className="focus-tomorrow-item__title">{task.title}</span>
+                {task.project_name && (
+                  <span className="focus-tomorrow-item__project">{task.project_name}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Task Card ─────────────────────────────────────────────────── */
+
+interface FocusCardProps {
+  task: TaskWithRelations
+  selected: boolean
+  projectColor?: string
+  onSelect: (taskId: number) => void
+  overdue?: boolean
+  showPulse?: boolean
+}
+
+function FocusCard({ task, selected, projectColor, onSelect, overdue, showPulse }: FocusCardProps) {
+  const tags = task.tag_names ? task.tag_names.split(',').map((t) => t.trim()) : []
+  const categoryIcon = getCategoryIcon(task.category_name)
+
+  return (
+    <button
+      type="button"
+      data-details-trigger="open"
+      className={[
+        'focus-card',
+        selected && 'focus-card--selected',
+        overdue && 'focus-card--overdue',
+        showPulse && 'focus-card--pulse',
+      ].filter(Boolean).join(' ')}
+      onClick={() => onSelect(task.id)}
+    >
+      {/* Top row: title + SP */}
+      <div className="focus-card__top">
+        <div className="focus-card__title-wrap">
+          <span className="focus-card__title">{task.title}</span>
+          {overdue && task.end_date && (
+            <span className="focus-card__due-date">{formatFriendlyDate(task.end_date)}</span>
+          )}
+        </div>
+        {task.story_points > 0 && (
+          <span className="focus-card__sp">{task.story_points} SP</span>
+        )}
+      </div>
+
+      {/* Footer: attributes */}
+      <div className="focus-card__footer">
+        {task.project_name && (
+          <span
+            className="focus-card__project"
+            style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
+          >
+            {task.project_name}
+          </span>
+        )}
+        {task.category_name && (
+          <span className="focus-card__category">
+            <CategoryIconSvg name={categoryIcon} />
+            {task.category_name}
+          </span>
+        )}
+        {tags.map((tag) => (
+          <span key={tag} className="focus-card__tag">#{tag}</span>
+        ))}
+      </div>
+    </button>
+  )
+}
+
+/* ─── Icons ─────────────────────────────────────────────────────── */
+
+function ZapIcon() {
+  return (
+    <svg className="focus-icon focus-icon--zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  )
+}
+
+function CircleIcon() {
+  return (
+    <svg className="focus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  )
+}
+
+function ProgressIcon() {
+  return (
+    <svg className="focus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 6v6l4 2" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg className="focus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  )
+}
+
+function AlertIcon({ small }: { small?: boolean }) {
+  return (
+    <svg className={small ? 'focus-icon focus-icon--small' : 'focus-icon'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
+function CategoryIconSvg({ name }: { name: string }) {
+  if (name === 'bar-chart-3') {
+    return (
+      <svg className="focus-icon focus-icon--small" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M18 20V10M12 20V4M6 20v-6" />
+      </svg>
+    )
+  }
+  if (name === 'code-xml') {
+    return (
+      <svg className="focus-icon focus-icon--small" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="16 18 22 12 16 6" />
+        <polyline points="8 6 2 12 8 18" />
+      </svg>
+    )
+  }
+  if (name === 'palette') {
+    return (
+      <svg className="focus-icon focus-icon--small" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
+        <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
+        <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
+        <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
+        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+      </svg>
+    )
+  }
+  return (
+    <svg className="focus-icon focus-icon--small" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+    </svg>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <p className="focus-empty">{text}</p>
+}
+
+export default FocusView

@@ -73,17 +73,33 @@ function TaskDetailsSidebar({
   onClose,
 }: TaskDetailsSidebarProps) {
   const selectedTask = useMemo(() => tasks.find((task) => task.id === selectedTaskId) ?? null, [tasks, selectedTaskId])
+  const subtasks = useMemo(() => {
+    if (!selectedTask) {
+      return []
+    }
+
+    return tasks
+      .filter((task) => task.parent_task_id === selectedTask.id)
+      .sort((a, b) => {
+        const aDate = a.end_date ?? '9999-12-31'
+        const bDate = b.end_date ?? '9999-12-31'
+        if (aDate !== bDate) {
+          return aDate.localeCompare(bDate)
+        }
+
+        return a.id - b.id
+      })
+  }, [tasks, selectedTask])
   const [draft, setDraft] = useState<TaskDraft>(createEmptyDraft())
   const [saving, setSaving] = useState(false)
-  const [showSubtaskCreator, setShowSubtaskCreator] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
   const [subtaskDate, setSubtaskDate] = useState('')
   const [creatingSubtask, setCreatingSubtask] = useState(false)
+  const [tagInput, setTagInput] = useState('')
 
   useEffect(() => {
     if (!open) {
       setDraft(createEmptyDraft())
-      setShowSubtaskCreator(false)
       setSubtaskTitle('')
       setSubtaskDate('')
       return
@@ -91,7 +107,6 @@ function TaskDetailsSidebar({
 
     if (!selectedTask) {
       setDraft(createEmptyDraft())
-      setShowSubtaskCreator(false)
       setSubtaskTitle('')
       setSubtaskDate('')
       return
@@ -112,22 +127,10 @@ function TaskDetailsSidebar({
       recurrence: selectedTask.recurrence,
       recurrenceRule: selectedTask.recurrence_rule,
     })
-    setShowSubtaskCreator(false)
+    setTagInput(getTagNamesFromIds(parseTagIds(selectedTask.tag_ids), tags))
     setSubtaskTitle('')
     setSubtaskDate('')
-  }, [open, selectedTask])
-
-  const statusTargets = useMemo(() => {
-    if (draft.status === 'todo') {
-      return ['in_progress'] as TaskStatus[]
-    }
-
-    if (draft.status === 'in_progress') {
-      return ['todo', 'done'] as TaskStatus[]
-    }
-
-    return ['in_progress'] as TaskStatus[]
-  }, [draft.status])
+  }, [open, selectedTask, tags])
 
   async function persistUpdate(payload: TaskUpdatePayload, successMessage: string): Promise<void> {
     if (!selectedTask) {
@@ -167,6 +170,18 @@ function TaskDetailsSidebar({
     }
 
     return 'Done'
+  }
+
+  function getPriorityLabel(priority: number): string {
+    if (priority === 1) {
+      return 'Low'
+    }
+
+    if (priority === 2) {
+      return 'Medium'
+    }
+
+    return 'High'
   }
 
   function maybeCommitTextField(field: 'title' | 'description', value: string): void {
@@ -245,17 +260,44 @@ function TaskDetailsSidebar({
   }
 
   function handleStatusChange(nextStatus: TaskStatus): void {
+    if (draft.status === nextStatus) {
+      return
+    }
+
     setDraft((current) => ({ ...current, status: nextStatus }))
     void persistUpdate({ status: nextStatus }, `Status changed to ${getStatusLabel(nextStatus)}.`)
   }
 
-  function handleTagToggle(tagId: number): void {
-    setDraft((current) => {
-      const exists = current.tagIds.includes(tagId)
-      const nextTagIds = exists ? current.tagIds.filter((id) => id !== tagId) : [...current.tagIds, tagId]
-      void persistUpdate({ tag_ids: nextTagIds }, 'Tags updated.')
-      return { ...current, tagIds: nextTagIds }
-    })
+  function handlePriorityChange(nextPriority: number): void {
+    if (draft.priority === nextPriority) {
+      return
+    }
+
+    setDraft((current) => ({ ...current, priority: nextPriority }))
+    maybeCommitPriority(nextPriority)
+  }
+
+  function maybeCommitTagsFromInput(value: string): void {
+    if (!selectedTask) {
+      return
+    }
+
+    const nextTagIds = parseTagInputToIds(value, tags)
+    const currentTagIds = [...draft.tagIds].sort((a, b) => a - b)
+    const sortedNextTagIds = [...nextTagIds].sort((a, b) => a - b)
+
+    const didChange =
+      currentTagIds.length !== sortedNextTagIds.length ||
+      currentTagIds.some((tagId, index) => tagId !== sortedNextTagIds[index])
+
+    if (!didChange) {
+      setTagInput(getTagNamesFromIds(draft.tagIds, tags))
+      return
+    }
+
+    setDraft((current) => ({ ...current, tagIds: sortedNextTagIds }))
+    setTagInput(getTagNamesFromIds(sortedNextTagIds, tags))
+    void persistUpdate({ tag_ids: sortedNextTagIds }, 'Tags updated.')
   }
 
   async function handleDeleteClick(): Promise<void> {
@@ -282,7 +324,6 @@ function TaskDetailsSidebar({
       })
       setSubtaskTitle('')
       setSubtaskDate('')
-      setShowSubtaskCreator(false)
     } finally {
       setCreatingSubtask(false)
     }
@@ -308,11 +349,11 @@ function TaskDetailsSidebar({
             <section className="status-section">
               <p className="status-title">Status Switch</p>
               <div className="status-switch" role="group" aria-label="Task status updates">
-                {statusTargets.map((status) => (
+                {(['todo', 'in_progress', 'done'] as TaskStatus[]).map((status) => (
                   <button
                     type="button"
                     key={status}
-                    className="status-option"
+                    className={`status-option status-option--${status}${draft.status === status ? ' status-option--active' : ''}`}
                     onClick={() => handleStatusChange(status)}
                   >
                     {getStatusLabel(status)}
@@ -321,61 +362,33 @@ function TaskDetailsSidebar({
               </div>
             </section>
 
-            <div className="subtask-actions">
-              <button
-                type="button"
-                className="subtask-toggle"
-                onClick={() => setShowSubtaskCreator((current) => !current)}
-                disabled={!selectedTask}
-              >
-                Create Subtask
-              </button>
-              <p className="muted">The subtask inherits the parent project automatically.</p>
-            </div>
-
-            {showSubtaskCreator && (
-              <div className="subtask-form" role="group" aria-label="Create subtask">
-                <input
-                  value={subtaskTitle}
-                  onChange={(event) => setSubtaskTitle(event.target.value)}
-                  placeholder="Subtask name"
-                />
-                <input type="date" value={subtaskDate} onChange={(event) => setSubtaskDate(event.target.value)} />
-                <button
-                  type="button"
-                  className="subtask-add"
-                  onClick={() => void handleCreateSubtaskClick()}
-                  disabled={!subtaskTitle.trim() || creatingSubtask}
-                >
-                  ADD
-                </button>
-              </div>
-            )}
-
-            <label className="field-row">
-              <span className="field-label">Title:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-title">Title:</label>
               <input
+                id="detail-title"
                 value={draft.title}
                 onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
                 onBlur={(event) => maybeCommitTextField('title', event.target.value)}
                 placeholder="Task title"
               />
-            </label>
+            </div>
 
-            <label className="field-row field-row--multiline">
-              <span className="field-label">Description:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-description">Description:</label>
               <textarea
+                id="detail-description"
                 rows={5}
                 value={draft.description}
                 onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
                 onBlur={(event) => maybeCommitTextField('description', event.target.value)}
                 placeholder="Add context"
               />
-            </label>
+            </div>
 
-            <label className="field-row">
-              <span className="field-label">Project:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-project">Project:</label>
               <select
+                id="detail-project"
                 value={draft.projectId ?? ''}
                 onChange={(event) => {
                   const nextValue = event.target.value === '' ? null : Number(event.target.value)
@@ -390,11 +403,12 @@ function TaskDetailsSidebar({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <label className="field-row">
-              <span className="field-label">Category:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-category">Category:</label>
               <select
+                id="detail-category"
                 value={draft.categoryId ?? ''}
                 onChange={(event) => {
                   const nextValue = event.target.value === '' ? null : Number(event.target.value)
@@ -409,11 +423,12 @@ function TaskDetailsSidebar({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <label className="field-row">
-              <span className="field-label">Type:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-type">Type:</label>
               <select
+                id="detail-type"
                 value={draft.type}
                 onChange={(event) => {
                   const nextType = event.target.value as TaskType
@@ -424,31 +439,28 @@ function TaskDetailsSidebar({
                 <option value="task">Task</option>
                 <option value="goal">Goal</option>
               </select>
-            </label>
+            </div>
 
-            <label className="field-row">
-              <span className="field-label">Priority:</span>
-              <select
-                value={draft.priority}
-                onChange={(event) => {
-                  const nextPriority = Number(event.target.value)
+            <section className="priority-section">
+              <p className="status-title">Priority Switch</p>
+              <div className="priority-switch" role="group" aria-label="Task priority updates">
+                {[1, 2, 3].map((priority) => (
+                  <button
+                    key={priority}
+                    type="button"
+                    className={`priority-option priority-option--${priority}${draft.priority === priority ? ' priority-option--active' : ''}`}
+                    onClick={() => handlePriorityChange(priority)}
+                  >
+                    {getPriorityLabel(priority)}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-                  setDraft((current) => ({
-                    ...current,
-                    priority: nextPriority,
-                  }))
-                }}
-                onBlur={(event) => maybeCommitPriority(Number(event.target.value))}
-              >
-                <option value={1}>Low</option>
-                <option value={2}>Medium</option>
-                <option value={3}>High</option>
-              </select>
-            </label>
-
-            <label className="field-row">
-              <span className="field-label">Story Points:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-story-points">Story Points:</label>
               <input
+                id="detail-story-points"
                 type="number"
                 min={0}
                 step={1}
@@ -465,43 +477,47 @@ function TaskDetailsSidebar({
                   }
                 }}
               />
-            </label>
+            </div>
 
-            <label className="field-row">
-              <span className="field-label">Start Date:</span>
-              <input
-                type="date"
-                value={draft.startDate}
-                disabled={draft.type === 'goal'}
-                onChange={(event) => {
-                  const nextStartDate = event.target.value
-                  setDraft((current) => ({ ...current, startDate: nextStartDate }))
-                }}
-                onBlur={(event) => maybeCommitStartDate(event.target.value)}
-              />
-            </label>
-
-            <label className="field-row">
-              <span className="field-label">Due Date:</span>
-              <input
-                type="date"
-                value={draft.endDate}
-                disabled={draft.type === 'goal'}
-                onChange={(event) => {
-                  const nextEndDate = event.target.value
-                  setDraft((current) => ({ ...current, endDate: nextEndDate }))
-                }}
-                onBlur={(event) => maybeCommitDueDate(event.target.value)}
-              />
-            </label>
+            <div className="detail-date-grid">
+              <div className="detail-field">
+                <label className="detail-label" htmlFor="detail-start-date">Start Date:</label>
+                <input
+                  id="detail-start-date"
+                  type="date"
+                  value={draft.startDate}
+                  disabled={draft.type === 'goal'}
+                  onChange={(event) => {
+                    const nextStartDate = event.target.value
+                    setDraft((current) => ({ ...current, startDate: nextStartDate }))
+                  }}
+                  onBlur={(event) => maybeCommitStartDate(event.target.value)}
+                />
+              </div>
+              <div className="detail-field">
+                <label className="detail-label" htmlFor="detail-due-date">Due Date:</label>
+                <input
+                  id="detail-due-date"
+                  type="date"
+                  value={draft.endDate}
+                  disabled={draft.type === 'goal'}
+                  onChange={(event) => {
+                    const nextEndDate = event.target.value
+                    setDraft((current) => ({ ...current, endDate: nextEndDate }))
+                  }}
+                  onBlur={(event) => maybeCommitDueDate(event.target.value)}
+                />
+              </div>
+            </div>
 
             {draft.type === 'goal' && (
               <p className="muted">Goal dates are calculated automatically from its subtasks.</p>
             )}
 
-            <label className="field-row">
-              <span className="field-label">Recurrence:</span>
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-recurrence">Recurrence:</label>
               <select
+                id="detail-recurrence"
                 value={draft.recurrence}
                 onChange={(event) => {
                   const nextValue = event.target.value as Recurrence
@@ -515,7 +531,7 @@ function TaskDetailsSidebar({
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
               </select>
-            </label>
+            </div>
 
             {draft.recurrence === 'weekly' && (
               <fieldset className="recurrence-fieldset">
@@ -552,9 +568,10 @@ function TaskDetailsSidebar({
             )}
 
             {draft.recurrence === 'monthly' && (
-              <label className="field-row">
-                <span className="field-label">Day of Month:</span>
+              <div className="detail-field">
+                <label className="detail-label" htmlFor="detail-day-of-month">Day of Month:</label>
                 <input
+                  id="detail-day-of-month"
                   type="number"
                   min={1}
                   max={31}
@@ -571,24 +588,26 @@ function TaskDetailsSidebar({
                   }}
                   placeholder="1-31"
                 />
-              </label>
+              </div>
             )}
 
-            <fieldset className="tags-fieldset">
-              <legend>Tags</legend>
-              <div className="tags-editor">
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-tags">Tags:</label>
+              <input
+                id="detail-tags"
+                list="task-tags-options"
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+                onBlur={(event) => maybeCommitTagsFromInput(event.target.value)}
+                placeholder="Type tags separated by comma"
+              />
+              <datalist id="task-tags-options">
                 {tags.map((tag) => (
-                  <label key={tag.id} className="tag-toggle">
-                    <input
-                      type="checkbox"
-                      checked={draft.tagIds.includes(tag.id)}
-                      onChange={() => handleTagToggle(tag.id)}
-                    />
-                    <span>{tag.name}</span>
-                  </label>
+                  <option key={tag.id} value={tag.name} />
                 ))}
-              </div>
-            </fieldset>
+              </datalist>
+              <p className="muted">Use existing tag names separated by comma.</p>
+            </div>
 
             {saving && <p className="muted">Saving changes...</p>}
 
@@ -597,6 +616,46 @@ function TaskDetailsSidebar({
                 Delete
               </button>
             </div>
+
+            <section className="subtask-panel" aria-label="Create and list subtasks">
+              <p className="status-title">Create Subtask</p>
+              <div className="subtask-form">
+                <div className="subtask-input-row">
+                  <input
+                    className="subtask-title-input"
+                    value={subtaskTitle}
+                    onChange={(event) => setSubtaskTitle(event.target.value)}
+                    placeholder="Subtask title"
+                  />
+                  <label className="subtask-date-picker" htmlFor="subtask-date" aria-label="Select subtask date">
+                    <input
+                      id="subtask-date"
+                      className="subtask-date-input"
+                      type="date"
+                      value={subtaskDate}
+                      onChange={(event) => setSubtaskDate(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="subtask-add"
+                  onClick={() => void handleCreateSubtaskClick()}
+                  disabled={!subtaskTitle.trim() || creatingSubtask}
+                >
+                  Add
+                </button>
+              </div>
+              <div className="subtask-list" role="list" aria-label="Subtasks list">
+                {subtasks.length === 0 && <p className="muted">No subtasks yet.</p>}
+                {subtasks.map((subtask) => (
+                  <div key={subtask.id} className="subtask-item" role="listitem">
+                    <span className="subtask-item__title">{subtask.title}</span>
+                    <span className="subtask-item__date">{formatSubtaskDate(subtask.end_date)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
           </>
         )}
       </div>
@@ -613,6 +672,56 @@ function parseTagIds(tagIds: string | null): number[] {
     .split(',')
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value) && value > 0)
+}
+
+function getTagNamesFromIds(tagIds: number[], tags: Tag[]): string {
+  const tagMap = new Map(tags.map((tag) => [tag.id, tag.name]))
+
+  return tagIds
+    .map((tagId) => tagMap.get(tagId))
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+}
+
+function parseTagInputToIds(inputValue: string, tags: Tag[]): number[] {
+  const names = inputValue
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (names.length === 0) {
+    return []
+  }
+
+  const tagIdByName = new Map(tags.map((tag) => [tag.name.trim().toLowerCase(), tag.id]))
+  const nextTagIds: number[] = []
+
+  for (const name of names) {
+    const tagId = tagIdByName.get(name)
+    if (tagId && !nextTagIds.includes(tagId)) {
+      nextTagIds.push(tagId)
+    }
+  }
+
+  return nextTagIds
+}
+
+function formatSubtaskDate(dateValue: string | null): string {
+  if (!dateValue) {
+    return '-'
+  }
+
+  const date = new Date(`${dateValue}T00:00:00`)
+
+  if (Number.isNaN(date.getTime())) {
+    return dateValue
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 export default TaskDetailsSidebar

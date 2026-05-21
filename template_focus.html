@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nokia Personal Task Management - Focus View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* Estilos personalizados para el scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+    <script>
+        // Configuración de colores de proyectos consistentes
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        project: {
+                            netsales: '#4f46e5', // Indigo
+                            cnscombo: '#10b981', // Emerald
+                            risk: '#f59e0b',     // Amber
+                        },
+                        tag: {
+                            focus: '#e0e7ff',    // Indigo-100
+                            focusText: '#4338ca',
+                            report: '#fef3c7',   // Amber-100
+                            reportText: '#b45309',
+                            urgent: '#ffe4e6',   // Rose-100
+                            urgentText: '#be123c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-900 flex flex-col h-screen overflow-hidden select-none">
+
+    <div class="h-8 bg-slate-900 flex items-center justify-between px-3 border-b border-slate-700 text-xs text-slate-400 shrink-0">
+        <div class="flex items-center space-x-2">
+            <span class="font-bold text-amber-400 flex items-center"><i data-lucide="crown" class="w-3.5 h-3.5 mr-1"></i> NOKIA</span>
+            <span class="text-slate-600">|</span>
+            <span>Personal Task Management</span>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button class="hover:text-white"><i data-lucide="minus" class="w-3 h-3"></i></button>
+            <button class="hover:text-white"><i data-lucide="square" class="w-2.5 h-2.5"></i></button>
+            <button class="hover:text-red-500"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+        </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+
+        <aside class="w-60 bg-slate-900 border-r border-slate-700 p-4 flex flex-col shrink-0 text-slate-300">
+            <nav class="space-y-1.5 flex-1 text-sm font-medium">
+                <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-md bg-blue-600 text-white shadow">
+                    <i data-lucide="target" class="w-4 h-4"></i> Vista de Enfoque (Focus)
+                </a>
+                <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-800 transition text-slate-400 hover:text-white">
+                    <i data-lucide="check-square" class="w-4 h-4"></i> Mis Tareas
+                </a>
+                <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-800 transition text-slate-400 hover:text-white">
+                    <i data-lucide="goals" class="w-4 h-4"></i> Goals
+                </a>
+                <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-800 transition text-slate-400 hover:text-white">
+                    <i data-lucide="calendar" class="w-4 h-4"></i> Calendario
+                </a>
+            </nav>
+            <div class="pt-4 border-t border-slate-700 text-xs text-slate-500 space-y-1">
+                <p>Proyectos Activos</p>
+                <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-project-netsales"></span> NETSALES / OI</div>
+                <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-project-cnscombo"></span> CNS Combo</div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden">
+            
+            <header class="p-6 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-sm">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-950 flex items-center gap-3">
+                        <i data-lucide="zap" class="w-7 h-7 text-amber-500"></i> Mi Día de Trabajo
+                    </h1>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">Miércoles, 20 de mayo de 2026. <span class="text-blue-600">Concéntrate en completar estas prioridades.</span></p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-slate-400">Filtrar:</span>
+                    <button class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-4 py-1.5 rounded-full font-semibold border border-slate-200">Todo el día</button>
+                    <button class="bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs px-4 py-1.5 rounded-full font-semibold flex items-center gap-1.5 transition">
+                        <i data-lucide="filter" class="w-3.5 h-3.5"></i> Más Filtros
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-8">
+
+                <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                        <h2 class="text-lg font-semibold text-slate-900 flex items-center gap-2.5">
+                            <i data-lucide="calendar-check" class="w-5 h-5 text-blue-600"></i> Prioridades para Hoy
+                        </h2>
+                        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-full text-xs font-semibold text-slate-600">
+                            <span class="text-slate-400 px-2">Agrupado por:</span>
+                            <button class="bg-white text-blue-700 px-3 py-1 rounded-full shadow-sm">Estatus</button>
+                            <button class="px-3 py-1 rounded-full hover:text-slate-900 transition">Proyecto</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        
+                        <div class="space-y-4">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 p-1.5 rounded-md bg-slate-50">
+                                <i data-lucide="circle" class="w-3.5 h-3.5 text-slate-400"></i> Por Hacer <span class="ml-auto text-slate-400 bg-white px-2 py-0.5 rounded-full text-[10px]">2</span>
+                            </h3>
+                            
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition cursor-pointer space-y-3 group">
+                                <div class="flex items-start justify-between gap-2">
+                                    <h4 class="text-lg font-bold text-slate-950 leading-tight group-hover:text-blue-700 transition">Finalizar reporte de ventas Q2</h4>
+                                    <span class="font-bold text-sm text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0" title="Story Points">5 SP</span>
+                                </div>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600 flex-wrap">
+                                    <span class="font-bold text-[11px] px-2.5 py-1 rounded text-white" style="background-color: #4f46e5;" title="Proyecto">NETSALES</span>
+                                    <span class="font-medium bg-slate-100 px-2.5 py-1 rounded text-slate-700 flex items-center gap-1"><i data-lucide="bar-chart-3" class="w-3 h-3 text-emerald-600"></i> Reporting</span>
+                                    <span class="px-2 py-1 rounded bg-tag-focus text-tag-focusText font-semibold text-[10px]">#focus</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition cursor-pointer space-y-3 group">
+                                <div class="flex items-start justify-between gap-2">
+                                    <h4 class="text-lg font-bold text-slate-950 leading-tight group-hover:text-blue-700 transition">Revisión de tickets de CNS Combo</h4>
+                                    <span class="font-bold text-sm text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0" title="Story Points">3 SP</span>
+                                </div>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600 flex-wrap">
+                                    <span class="font-bold text-[11px] px-2.5 py-1 rounded text-white" style="background-color: #10b981;" title="Proyecto">CNS Combo</span>
+                                    <span class="font-medium bg-slate-100 px-2.5 py-1 rounded text-slate-700 flex items-center gap-1"><i data-lucide="code-xml" class="w-3 h-3 text-indigo-600"></i> Development</span>
+                                    <span class="px-2 py-1 rounded bg-tag-report text-tag-reportText font-semibold text-[10px]">#ticket</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 p-1.5 rounded-md bg-emerald-50 text-emerald-900">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-emerald-500"></i> En Progreso <span class="ml-auto text-emerald-700 bg-white px-2 py-0.5 rounded-full text-[10px]">1</span>
+                            </h3>
+                            <div class="bg-white p-4 rounded-xl border-2 border-emerald-300 shadow-lg hover:border-emerald-400 transition cursor-pointer space-y-3 group">
+                                <div class="flex items-start justify-between gap-2">
+                                    <h4 class="text-lg font-bold text-slate-950 leading-tight group-hover:text-emerald-700 transition">Desplegar hotfix v1.4.1</h4>
+                                    <span class="font-bold text-sm text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0" title="Story Points">3 SP</span>
+                                </div>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600 flex-wrap">
+                                    <span class="font-bold text-[11px] px-2.5 py-1 rounded text-white" style="background-color: #4f46e5;" title="Proyecto">NETSALES</span>
+                                    <span class="font-medium bg-slate-100 px-2.5 py-1 rounded text-slate-700 flex items-center gap-1"><i data-lucide="code-xml" class="w-3 h-3 text-indigo-600"></i> Development</span>
+                                    <span class="px-2 py-1 rounded bg-tag-urgent text-tag-urgentText font-semibold text-[10px]">#release</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 p-1.5 rounded-md bg-blue-50 text-blue-900">
+                                <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-blue-500"></i> Completado <span class="ml-auto text-blue-700 bg-white px-2 py-0.5 rounded-full text-[10px]">0</span>
+                            </h3>
+                            <div class="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                                No has completado ninguna tarea hoy.
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-red-700 flex items-center gap-2.5">
+                            <i data-lucide="clock-alert" class="w-5 h-5 text-red-600"></i> Tareas Atrasadas
+                        </h2>
+                        <span class="text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200">Total: 1</span>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm hover:border-red-300 transition cursor-pointer group flex items-center gap-4">
+                            <input type="checkbox" class="w-5 h-5 rounded border-red-300 text-red-600 focus:ring-red-500">
+                            <div class="flex-1 space-y-2">
+                                <h4 class="text-base font-bold text-slate-950 group-hover:text-red-700 transition">Llamada con stakeholder Risk and Upside</h4>
+                                <div class="flex items-center gap-2 text-xs text-slate-600 flex-wrap">
+                                    <span class="font-bold text-[10px] px-2 py-0.5 rounded text-white" style="background-color: #f59e0b;" title="Proyecto">RISK & UPSIDE</span>
+                                    <span class="font-medium bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3 text-slate-500"></i> Reunión</span>
+                                    <span class="font-bold text-red-600 bg-white border border-red-200 px-2 py-0.5 rounded-lg" title="Story Points">1 SP</span>
+                                    <span class="font-semibold text-red-800 ml-auto flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Venció ayer</span>
+                                </div>
+                            </div>
+                            <button class="text-slate-400 hover:text-red-600 transition p-1"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <script> lucide.createIcons(); </script>
+</body>
+</html>

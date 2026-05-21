@@ -1,7 +1,8 @@
 import { Suspense, lazy } from 'react'
-import type { TaskWithRelations } from '../../common/types'
+import type { Project, TaskWithRelations } from '../../common/types'
 import TableView from '../views/TableView'
 import TodayView from '../views/TodayView'
+import FocusView from '../views/FocusView'
 import CreateCategoryView from '../views/CreateCategoryView'
 import CreateProjectView from '../views/CreateProjectView'
 import CreateTagView from '../views/CreateTagView'
@@ -10,21 +11,29 @@ export type ViewType =
   | 'tasks'
   | 'goals'
   | 'today'
+  | 'focus'
   | 'calendar'
   | 'gantt'
   | 'create-project'
   | 'create-tag'
   | 'create-category'
 
+export interface QuickCreateOptions {
+  endDate?: string | null
+  priority?: 1 | 2 | 3
+  projectId?: number | null
+}
+
 interface ViewManagerProps {
   viewType: ViewType
   tasks: TaskWithRelations[]
+  projects: Project[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
   projectId: number | null
   categoryId: number | null
   tagId: number | null
-  onCreateTask: (title: string, type?: 'task' | 'goal') => Promise<void>
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<void>
   onCreateGoalSubtask: (goalId: number, title: string) => Promise<void>
   onCreateProject: (name: string, color: string) => Promise<void>
   onCreateTag: (name: string, color: string) => Promise<void>
@@ -37,6 +46,7 @@ const GanttView = lazy(() => import('../views/GanttView'))
 function ViewManager({
   viewType,
   tasks,
+  projects,
   onSelectTask,
   selectedTaskId,
   projectId,
@@ -54,6 +64,7 @@ function ViewManager({
     return (
       <TableView
         tasks={tasks.filter((task) => task.type !== 'goal')}
+        projects={projects}
         onSelectTask={onSelectTask}
         selectedTaskId={selectedTaskId}
         projectId={projectId}
@@ -71,6 +82,7 @@ function ViewManager({
         description="Objectives and tasks linked to each objective."
         createType="goal"
         tasks={objectiveTasks}
+        projects={projects}
         onSelectTask={onSelectTask}
         selectedTaskId={selectedTaskId}
         projectId={projectId}
@@ -84,6 +96,10 @@ function ViewManager({
 
   if (viewType === 'today') {
     return <TodayView tasks={tasks} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
+  }
+
+  if (viewType === 'focus') {
+    return <FocusView tasks={tasks} projects={projects} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
   }
 
   if (viewType === 'create-project') {

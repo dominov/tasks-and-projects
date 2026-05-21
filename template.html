@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Task Management - Rediseño Profesional</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen overflow-hidden select-none">
+
+  <!-- BARRA DE TÍTULO DE VENTANA (Estilo Electron) -->
+  <div class="h-9 bg-slate-950 flex items-center justify-between px-3 border-b border-slate-800 text-xs text-slate-400">
+    <div class="flex items-center space-x-4">
+      <span class="font-bold text-amber-500 flex items-center gap-1">
+        <i data-lucide="crown" class="w-4 h-4"></i>
+      </span>
+      <div class="flex space-x-3">
+        <span class="hover:text-slate-200 cursor-pointer">File</span>
+        <span class="hover:text-slate-200 cursor-pointer">Edit</span>
+        <span class="hover:text-slate-200 cursor-pointer">View</span>
+        <span class="hover:text-slate-200 cursor-pointer">Window</span>
+      </div>
+    </div>
+    <div class="text-slate-400 font-medium">Personal Task Management</div>
+    <div class="flex items-center space-x-3">
+      <button class="hover:text-slate-200"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+      <button class="hover:text-slate-200"><i data-lucide="square" class="w-3 h-3"></i></button>
+      <button class="hover:text-rose-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- SECCIÓN 1: MENÚ LATERAL IZQUIERDO -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between overflow-y-auto">
+      <div class="p-4 space-y-6">
+        
+        <!-- Navegación Principal -->
+        <nav class="space-y-1">
+          <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-450 hover:bg-slate-800/50 hover:text-slate-200 transition">
+            <span class="flex items-center gap-3 text-sm font-medium">
+              <i data-lucide="calendar-days" class="w-4 h-4 text-slate-450"></i> Today
+            </span>
+            <span class="text-xs bg-slate-850 px-2 py-0.5 rounded-full text-slate-400">3</span>
+          </a>
+          <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-600/10 border border-blue-500/20 text-blue-400 transition">
+            <span class="flex items-center gap-3 text-sm font-semibold">
+              <i data-lucide="check-square" class="w-4 h-4 text-blue-400"></i> My Tasks
+            </span>
+            <span class="text-xs bg-blue-500/20 px-2 py-0.5 rounded-full text-blue-300">11</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-450 hover:bg-slate-800/50 hover:text-slate-200 transition text-sm font-medium">
+            <i data-lucide="target" class="w-4 h-4"></i> Goals
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-455 hover:bg-slate-800/50 hover:text-slate-200 transition text-sm font-medium">
+            <i data-lucide="calendar" class="w-4 h-4"></i> Calendar
+          </a>
+        </nav>
+
+        <!-- Filtro Completadas -->
+        <div class="pt-2 border-t border-slate-800/60">
+          <label class="flex items-center justify-between px-3 py-1.5 cursor-pointer text-xs text-slate-400 hover:text-slate-200 transition">
+            <span>Show completed tasks</span>
+            <input type="checkbox" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900">
+          </label>
+        </div>
+
+        <!-- Sección Proyectos -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <span>Projects</span>
+            <button class="hover:text-blue-400 transition flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Add</button>
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs">
+              <span class="flex items-center gap-2 text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> NETSALES / OI
+              </span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs">
+              <span class="flex items-center gap-2 text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-550"></span> CNS Combo Actuals
+              </span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs">
+              <span class="flex items-center gap-2 text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Risk and Upside
+              </span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección Categorías -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <span>Categories</span>
+            <button class="hover:text-blue-400 transition flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Add</button>
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between px-3 py-1.5 rounded-md bg-slate-800/40 text-xs text-blue-450 font-medium">
+              <span>All Categories</span>
+            </div>
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs text-slate-300">
+              <span>Development</span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs text-slate-300">
+              <span>Reporting</span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección Etiquetas -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <span>Tags</span>
+            <button class="hover:text-blue-400 transition flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Add</button>
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs text-slate-300">
+              <span class="flex items-center gap-1.5"><i data-lucide="hash" class="w-3.5 h-3.5 text-indigo-400"></i> focus</span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs text-slate-300">
+              <span class="flex items-center gap-1.5"><i data-lucide="hash" class="w-3.5 h-3.5 text-amber-400"></i> report</span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <div class="flex items-center justify-between group px-3 py-1.5 rounded-md hover:bg-slate-800/40 text-xs text-slate-300">
+              <span class="flex items-center gap-1.5"><i data-lucide="hash" class="w-3.5 h-3.5 text-rose-450"></i> urgent</span>
+              <button class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-450 transition">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Perfil -->
+      <div class="p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white text-[10px]">
+            PM
+          </div>
+          <div>
+            <p class="font-medium text-slate-200">Nokia TPM</p>
+            <p class="text-[10px] text-slate-500">v1.4.0</p>
+          </div>
+        </div>
+        <button class="hover:text-slate-200 transition"><i data-lucide="settings" class="w-4 h-4"></i></button>
+      </div>
+    </aside>
+
+    <!-- SECCIÓN 2: TABLA DE TAREAS CENTRAL -->
+    <main class="flex-1 bg-slate-50 text-slate-800 flex flex-col overflow-hidden">
+      
+      <!-- Cabecera de la sección central (Limpia, sin el botón naranja) -->
+      <div class="p-6 bg-white border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">WORKSPACE</span>
+          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Personal Task Management</h1>
+          <p class="text-xs text-slate-500 mt-0.5">Controla las entregas, prioridades y el progreso de tus reportes automatizados.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full font-semibold border border-slate-250">Total: 11 tareas</span>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros y Búsqueda -->
+      <div class="px-6 py-3 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-4">
+        <div class="flex-1 max-w-sm">
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" placeholder="Buscar tarea..." class="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-550/20 focus:border-blue-500 transition shadow-sm">
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-500 font-medium">Agrupar por:</span>
+          <select class="bg-white border border-slate-200 rounded-lg text-xs px-3 py-1.5 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm transition cursor-pointer">
+            <option>Categoría</option>
+            <option>Proyecto</option>
+            <option>Prioridad</option>
+            <option>Estado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- NUEVA BARRA DE CREACIÓN RÁPIDA (Reemplaza la fila de la tabla y es totalmente visible) -->
+      <div class="px-6 pt-4 pb-2 bg-slate-50">
+        <div class="bg-white rounded-xl border border-blue-200 shadow-sm p-3 flex flex-col md:flex-row items-center gap-3">
+          <div class="flex items-center gap-2 w-full md:w-auto flex-1">
+            <i data-lucide="plus-circle" class="w-5 h-5 text-blue-500 shrink-0"></i>
+            <input type="text" placeholder="Escribe el nombre de una nueva tarea..." class="w-full bg-transparent border-none text-xs text-slate-800 placeholder-slate-400 font-medium focus:outline-none focus:ring-0 py-1.5" id="quick-input-title">
+          </div>
+          <div class="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
+            <!-- Proyecto selector rápido -->
+            <select class="bg-slate-50 border border-slate-200 rounded-lg text-[11px] px-2.5 py-1.5 text-slate-600 focus:outline-none cursor-pointer">
+              <option value="" disabled selected>Proyecto...</option>
+              <option>NETSALES / OI</option>
+              <option>CNS Combo Actuals</option>
+              <option>Risk and Upside</option>
+            </select>
+            <!-- Categoría selector rápida -->
+            <select class="bg-slate-50 border border-slate-200 rounded-lg text-[11px] px-2.5 py-1.5 text-slate-600 focus:outline-none cursor-pointer">
+              <option value="" disabled selected>Categoría...</option>
+              <option>Development</option>
+              <option>Reporting</option>
+            </select>
+            <!-- Botón Crear -->
+            <button onclick="addNewTaskSimulated()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-1.5 rounded-lg shadow-sm transition">
+              Crear Tarea
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de tareas -->
+      <div class="flex-1 overflow-auto px-6 pb-6 pt-2">
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-w-[800px]">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-200">
+                <th class="py-3 px-4 w-12 text-center border-r border-slate-150">Status</th>
+                <th class="py-3 px-4 w-2/5 border-r border-slate-150">Title</th>
+                <th class="py-3 px-4 border-r border-slate-150">End Date</th>
+                <th class="py-3 px-4 border-r border-slate-150">Priority</th>
+                <th class="py-3 px-4 border-r border-slate-150">Project</th>
+                <th class="py-3 px-4 border-r border-slate-150">Category</th>
+                <th class="py-3 px-4">Story Points</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+
+              <!-- CATEGORÍA: DEVELOPMENT -->
+              <tr class="bg-slate-50 border-l-4 border-indigo-500 border-b-2 border-slate-200">
+                <td colspan="7" class="py-2.5 px-4 font-bold text-slate-700 text-xs bg-gradient-to-r from-slate-100/80 to-white">
+                  <span class="flex items-center gap-2">
+                    <i data-lucide="folder-code" class="w-4 h-4 text-indigo-500"></i> Category: Development
+                  </span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(1)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">
+                  <div class="flex items-center justify-between">
+                    <span>Ejecutar combo NETSALES</span>
+                    <i data-lucide="repeat-2" class="w-3.5 h-3.5 text-slate-400" title="Recurrence active"></i>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-20</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150">Development</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+
+              <!-- CATEGORÍA: NO CATEGORY -->
+              <tr class="bg-slate-50 border-l-4 border-slate-400 border-b-2 border-slate-200">
+                <td colspan="7" class="py-2.5 px-4 font-bold text-slate-700 text-xs bg-gradient-to-r from-slate-100/80 to-white">
+                  <span class="flex items-center gap-2">
+                    <i data-lucide="help-circle" class="w-4 h-4 text-slate-400"></i> Category: No category
+                  </span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(2)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">Actualizar p20</td>
+                <td class="py-3 px-4 text-slate-400 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-400 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(3)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">
+                  <div class="flex items-center justify-between">
+                    <span>Weekly Backup Risk and Upside</span>
+                    <i data-lucide="repeat-2" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-25</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 text-slate-400 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 text-slate-400 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(4)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">
+                  <div class="flex items-center justify-between">
+                    <span>Weekly Backup Risk and Upside</span>
+                    <i data-lucide="repeat-2" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-26</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 text-slate-400 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 text-slate-400 border-r border-slate-155">-</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+
+              <!-- CATEGORÍA: REPORTING -->
+              <tr class="bg-slate-50 border-l-4 border-emerald-550 border-b-2 border-slate-200">
+                <td colspan="7" class="py-2.5 px-4 font-bold text-slate-700 text-xs bg-gradient-to-r from-slate-100/80 to-white">
+                  <span class="flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-500"></i> Category: Reporting
+                  </span>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(5)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">Submit overdue invoice follow-up</td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2025-12-02</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">High</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150">Reporting</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer bg-blue-50/30" onclick="selectTask(6)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <!-- IN PROGRESS: Círculo verde con pulso -->
+                  <div class="flex items-center justify-center">
+                    <span class="relative flex h-3.5 w-3.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 shadow-sm" title="In Progress"></span>
+                    </span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-900 border-r border-slate-150">
+                  Collect requirements for weekly plan
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-14</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150">Reporting</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">3</td>
+              </tr>
+              
+              <!-- SUBTASK: necesito hablar con el cliente -->
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(7)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150 pl-8">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="corner-down-right" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                    <span class="font-medium">necesito hablar con el cliente</span>
+                    <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 uppercase shrink-0">Subtask</span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-450 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 text-slate-450 border-r border-slate-150">-</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+
+              <!-- SUBTASK: Actualizar QTC -->
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(8)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="relative flex h-3.5 w-3.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 shadow-sm" title="In Progress"></span>
+                    </span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150 pl-8">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="corner-down-right" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                    <span class="font-medium text-slate-750">Actualizar QTC</span>
+                    <span class="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 uppercase shrink-0">Subtask</span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150">2026-05-19</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-450 border-r border-slate-155">-</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(9)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="relative flex h-3.5 w-3.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 shadow-sm" title="In Progress"></span>
+                    </span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">Apply system updates</td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-20</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">High</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-250/20">CNS Combo Actuals</span>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">Reporting</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">4</td>
+              </tr>
+
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(10)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">
+                  <div class="flex items-center justify-between">
+                    <span>Ejecutar combo NETSALES</span>
+                    <i data-lucide="repeat-2" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-26</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Low</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150">Reporting</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+
+              <tr class="hover:bg-slate-50/60 transition cursor-pointer" onclick="selectTask(11)">
+                <td class="py-3 px-4 text-center border-r border-slate-150">
+                  <div class="flex items-center justify-center">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-400 bg-white inline-block shadow-sm" title="To Do"></span>
+                  </div>
+                </td>
+                <td class="py-3 px-4 font-semibold text-slate-800 border-r border-slate-150">
+                  <div class="flex items-center justify-between">
+                    <span>Ejecutar combo NETSALES</span>
+                    <i data-lucide="repeat-2" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-550 border-r border-slate-150">2026-05-27</td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Medium</span>
+                </td>
+                <td class="py-3 px-4 border-r border-slate-150">
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-250/20">NETSALES / OI</span>
+                </td>
+                <td class="py-3 px-4 text-slate-500 border-r border-slate-150">Reporting</td>
+                <td class="py-3 px-4 font-bold text-slate-700 text-center">1</td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- SECCIÓN 3: DETALLE DE TAREA LATERAL DERECHO -->
+    <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between overflow-y-auto">
+      <div class="p-6 space-y-6">
+        
+        <!-- Header del panel detalle -->
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="sidebar-open" class="w-4 h-4 text-blue-500"></i> Task Details
+          </h2>
+          <button class="text-slate-400 hover:text-slate-200 transition"><i data-lucide="x" class="w-4.5 h-4.5"></i></button>
+        </div>
+
+        <!-- Estado / Switch -->
+        <div class="space-y-2">
+          <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Status Switch</label>
+          <div class="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg">
+            <button onclick="setStatus('todo')" id="btn-todo" class="py-1 text-xs font-semibold rounded text-slate-300 bg-slate-800 hover:text-slate-100 transition shadow">To Do</button>
+            <button onclick="setStatus('progress')" id="btn-progress" class="py-1 text-xs font-semibold rounded text-slate-400 hover:text-slate-200 transition">Progress</button>
+            <button onclick="setStatus('done')" id="btn-done" class="py-1 text-xs font-semibold rounded text-slate-400 hover:text-slate-200 transition">Done</button>
+          </div>
+        </div>
+
+        <!-- Botón Subtask -->
+        <div>
+          <button class="w-full bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 font-semibold text-xs py-2 rounded-lg transition flex items-center justify-center gap-2">
+            <i data-lucide="list-plus" class="w-4 h-4"></i> Create Subtask
+          </button>
+          <p class="text-[10px] text-slate-550 text-center mt-1.5">La subtarea hereda el proyecto padre de forma automática.</p>
+        </div>
+
+        <!-- Formulario de detalles -->
+        <div class="space-y-4">
+          <!-- Título -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Title:</label>
+            <input type="text" id="detail-title" value="Collect requirements for weekly plan" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+          </div>
+
+          <!-- Descripción -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Description:</label>
+            <textarea id="detail-desc" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 placeholder-slate-650 focus:outline-none focus:border-blue-500 transition resize-none">Gather pending items and blockers for the week.</textarea>
+          </div>
+
+          <!-- Proyecto -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Project:</label>
+            <select id="detail-project" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+              <option selected>NETSALES / OI</option>
+              <option>CNS Combo Actuals</option>
+              <option>Risk and Upside</option>
+              <option>- (None)</option>
+            </select>
+          </div>
+
+          <!-- Categoría -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Category:</label>
+            <select id="detail-category" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+              <option selected>Reporting</option>
+              <option>Development</option>
+              <option>- (None)</option>
+            </select>
+          </div>
+
+          <!-- Tipo -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Type:</label>
+            <select id="detail-type" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+              <option selected>Task</option>
+              <option>Subtask</option>
+              <option>Bug</option>
+            </select>
+          </div>
+
+          <!-- Prioridad -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Priority:</label>
+            <select id="detail-priority" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+              <option>Low</option>
+              <option selected>Medium</option>
+              <option>High</option>
+            </select>
+          </div>
+
+          <!-- Story Points -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Story Points:</label>
+            <input type="number" id="detail-points" value="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+          </div>
+
+          <!-- Fechas -->
+          <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Start Date:</label>
+              <input type="date" id="detail-start" value="2026-05-12" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-2 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Due Date:</label>
+              <input type="date" id="detail-due" value="2026-05-14" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-2 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+            </div>
+          </div>
+
+          <!-- Recurrencia -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recurrence:</label>
+            <select id="detail-recurrence" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition">
+              <option>None</option>
+              <option selected>Weekly</option>
+              <option>Daily</option>
+              <option>Monthly</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Footer de Guardado -->
+      <div class="p-4 border-t border-slate-800 bg-slate-950/40 flex gap-2">
+        <button class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs py-2 rounded-lg transition">
+          Save Changes
+        </button>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Lucide Icons Trigger y Lógica -->
+  <script>
+    lucide.createIcons();
+
+    // Simular creación de tarea desde la barra superior
+    function addNewTaskSimulated() {
+      const input = document.getElementById('quick-input-title');
+      if (input.value.trim() === '') {
+        alert('Por favor ingresa un nombre para la tarea.');
+        return;
+      }
+      input.value = '';
+    }
+
+    const tasksData = {
+      1: { title: "Ejecutar combo NETSALES", desc: "Correr ETL principal de ventas y actualizar el dashboard de PowerBI.", project: "NETSALES / OI", category: "Development", priority: "Medium", points: 1, start: "2026-05-20", due: "2026-05-20", recurrence: "Weekly", status: "todo" },
+      2: { title: "Actualizar p20", desc: "Cargar los nuevos parámetros correspondientes a la pauta comercial p20.", project: "NETSALES / OI", category: "Reporting", priority: "Medium", points: 1, start: "2026-05-18", due: "2026-05-22", recurrence: "None", status: "todo" },
+      3: { title: "Weekly Backup Risk and Upside", desc: "Copia de seguridad semanal de los riesgos identificados en el pipeline.", project: "Risk and Upside", category: "Development", priority: "Medium", points: 1, start: "2026-05-25", due: "2026-05-25", recurrence: "Weekly", status: "todo" },
+      4: { title: "Weekly Backup Risk and Upside", desc: "Copia de seguridad correspondiente al siguiente periodo calendarizado.", project: "Risk and Upside", category: "Development", priority: "Medium", points: 1, start: "2026-05-26", due: "2026-05-26", recurrence: "Weekly", status: "todo" },
+      5: { title: "Submit overdue invoice follow-up", desc: "Enviar correos de seguimiento a clientes con facturas vencidas.", project: "NETSALES / OI", category: "Reporting", priority: "High", points: 1, start: "2025-12-01", due: "2025-12-02", recurrence: "None", status: "todo" },
+      6: { title: "Collect requirements for weekly plan", desc: "Gather pending items and blockers for the week.", project: "NETSALES / OI", category: "Reporting", priority: "Medium", points: 3, start: "2026-05-12", due: "2026-05-14", recurrence: "None", status: "progress" },
+      7: { title: "necesito hablar con el cliente", desc: "Llamada directa para validar el alcance de los reportes del plan de ventas.", project: "NETSALES / OI", category: "Reporting", priority: "Medium", points: 1, start: "2026-05-13", due: "2026-05-14", recurrence: "None", status: "todo" },
+      8: { title: "Actualizar QTC", desc: "Reflejar cambios en la base de datos de QTC.", project: "NETSALES / OI", category: "Reporting", priority: "Medium", points: 1, start: "2026-05-19", due: "2026-05-19", recurrence: "None", status: "progress" },
+      9: { title: "Apply system updates", desc: "Ejecutar scripts de actualización de la infraestructura de base de datos local.", project: "CNS Combo Actuals", category: "Reporting", priority: "High", points: 4, start: "2026-05-20", due: "2026-05-20", recurrence: "None", status: "progress" },
+      10: { title: "Ejecutar combo NETSALES", desc: "Segunda ejecución programada del combo NETSALES para la fecha.", project: "NETSALES / OI", category: "Reporting", priority: "Low", points: 1, start: "2026-05-26", due: "2026-05-26", recurrence: "Weekly", status: "todo" },
+      11: { title: "Ejecutar combo NETSALES", desc: "Tercera ejecución programada del combo NETSALES para la fecha.", project: "NETSALES / OI", category: "Reporting", priority: "Medium", points: 1, start: "2026-05-27", due: "2026-05-27", recurrence: "Weekly", status: "todo" }
+    };
+
+    function selectTask(id) {
+      const task = tasksData[id];
+      if (!task) return;
+
+      document.getElementById('detail-title').value = task.title;
+      document.getElementById('detail-desc').value = task.desc;
+      document.getElementById('detail-project').value = task.project || "- (None)";
+      document.getElementById('detail-category').value = task.category || "- (None)";
+      document.getElementById('detail-priority').value = task.priority;
+      document.getElementById('detail-points').value = task.points;
+      document.getElementById('detail-start').value = task.start;
+      document.getElementById('detail-due').value = task.due;
+      document.getElementById('detail-recurrence').value = task.recurrence;
+      
+      setStatus(task.status);
+    }
+
+    function setStatus(status) {
+      const btnTodo = document.getElementById('btn-todo');
+      const btnProgress = document.getElementById('btn-progress');
+      const btnDone = document.getElementById('btn-done');
+
+      [btnTodo, btnProgress, btnDone].forEach(btn => {
+        btn.className = "py-1 text-xs font-semibold rounded text-slate-400 hover:text-slate-200 transition";
+      });
+
+      if (status === 'todo') {
+        btnTodo.className = "py-1 text-xs font-semibold rounded text-slate-100 bg-slate-800 transition shadow border border-slate-700";
+      } else if (status === 'progress') {
+        btnProgress.className = "py-1 text-xs font-semibold rounded text-emerald-450 bg-emerald-950/50 border border-emerald-900/30 transition shadow";
+      } else if (status === 'done') {
+        btnDone.className = "py-1 text-xs font-semibold rounded text-blue-400 bg-blue-950/50 border border-blue-900/30 transition shadow";
+      }
+    }
+  </script>
+</body>
+</html>

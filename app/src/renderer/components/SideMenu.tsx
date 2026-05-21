@@ -23,13 +23,99 @@ interface SideMenuProps {
   onDeleteCategory: (category: Category) => void
 }
 
-const viewMenu: Array<{ id: ViewType; label: string }> = [
-  { id: 'today', label: 'Today' },
-  { id: 'tasks', label: 'My Tasks' },
-  { id: 'goals', label: 'Goals' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'gantt', label: 'Gantt' },
+type IconName = 'calendar-days' | 'check-square' | 'target' | 'calendar' | 'chart' | 'focus' | 'plus' | 'trash'
+
+const viewMenu: Array<{ id: ViewType; label: string; icon: IconName }> = [
+  { id: 'today', label: 'Today', icon: 'calendar-days' },
+  { id: 'focus', label: 'Focus', icon: 'focus' },
+  { id: 'tasks', label: 'My Tasks', icon: 'check-square' },
+  { id: 'goals', label: 'Goals', icon: 'target' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+  { id: 'gantt', label: 'Gantt', icon: 'chart' },
 ]
+
+function getProjectToneClass(projectId: number): string {
+  return `project-dot--tone-${projectId % 6}`
+}
+
+function SidebarIcon({ name }: { name: IconName }) {
+  if (name === 'calendar-days') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <line x1="8" y1="2.5" x2="8" y2="6.5" />
+        <line x1="16" y1="2.5" x2="16" y2="6.5" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    )
+  }
+
+  if (name === 'check-square') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <polyline points="8,12 11,15 16,9" />
+      </svg>
+    )
+  }
+
+  if (name === 'target') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="12" cy="12" r="1" />
+      </svg>
+    )
+  }
+
+  if (name === 'calendar') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <line x1="8" y1="2.5" x2="8" y2="6.5" />
+        <line x1="16" y1="2.5" x2="16" y2="6.5" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    )
+  }
+
+  if (name === 'chart') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+        <line x1="4" y1="20" x2="20" y2="20" />
+        <rect x="6" y="11" width="3" height="9" rx="1" />
+        <rect x="11" y="7" width="3" height="13" rx="1" />
+        <rect x="16" y="4" width="3" height="16" rx="1" />
+      </svg>
+    )
+  }
+
+  if (name === 'plus') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon menu-icon--mini">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    )
+  }
+
+  if (name === 'focus') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon menu-icon--mini">
+      <path d="M4 7h16" />
+      <path d="M9 7V5h6v2" />
+      <path d="M7 7l1 12h8l1-12" />
+    </svg>
+  )
+}
 
 function SideMenu({
   viewType,
@@ -64,7 +150,10 @@ function SideMenu({
               className={viewType === item.id ? 'nav-item active' : 'nav-item'}
               onClick={() => onChangeView(item.id)}
             >
-              {item.label}
+              <span className="nav-item-label">
+                <SidebarIcon name={item.icon} />
+                {item.label}
+              </span>
             </button>
           ))}
         </nav>
@@ -85,6 +174,7 @@ function SideMenu({
         <div className="menu-section-title-row">
           <h3>Projects</h3>
           <button type="button" className="mini-add" onClick={onOpenProjectCreateView}>
+            <SidebarIcon name="plus" />
             Add
           </button>
         </div>
@@ -102,11 +192,11 @@ function SideMenu({
               className={selectedProjectId === project.id ? 'chip active' : 'chip'}
               onClick={() => onSelectProject(project.id)}
             >
-              <span className="dot" aria-hidden="true" />
+              <span className={`dot ${getProjectToneClass(project.id)}`} aria-hidden="true" />
               {project.name}
             </button>
-            <button type="button" className="chip-delete" onClick={() => onDeleteProject(project)}>
-              Delete
+            <button type="button" className="chip-delete" onClick={() => onDeleteProject(project)} aria-label="Delete project">
+              <SidebarIcon name="trash" />
             </button>
           </div>
         ))}
@@ -117,6 +207,7 @@ function SideMenu({
         <div className="menu-section-title-row">
           <h3>Categories</h3>
           <button type="button" className="mini-add" onClick={onOpenCategoryCreateView}>
+            <SidebarIcon name="plus" />
             Add
           </button>
         </div>
@@ -136,8 +227,8 @@ function SideMenu({
             >
               {category.name}
             </button>
-            <button type="button" className="chip-delete" onClick={() => onDeleteCategory(category)}>
-              Delete
+            <button type="button" className="chip-delete" onClick={() => onDeleteCategory(category)} aria-label="Delete category">
+              <SidebarIcon name="trash" />
             </button>
           </div>
         ))}
@@ -147,6 +238,7 @@ function SideMenu({
         <div className="menu-section-title-row">
           <h3>Tags</h3>
           <button type="button" className="mini-add" onClick={onOpenTagCreateView}>
+            <SidebarIcon name="plus" />
             Add
           </button>
         </div>
@@ -164,11 +256,12 @@ function SideMenu({
               className={selectedTagId === tag.id ? 'chip active' : 'chip'}
               onClick={() => onSelectTag(tag.id)}
             >
-              <span className="dot" aria-hidden="true" />
+              <span className={`dot project-dot--tone-${tag.id % 6}`} aria-hidden="true" />
+              <span className="tag-prefix">#</span>
               {tag.name}
             </button>
-            <button type="button" className="chip-delete" onClick={() => onDeleteTag(tag)}>
-              Delete
+            <button type="button" className="chip-delete" onClick={() => onDeleteTag(tag)} aria-label="Delete tag">
+              <SidebarIcon name="trash" />
             </button>
           </div>
         ))}
