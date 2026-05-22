@@ -15,6 +15,7 @@ function App() {
   const [tagId, setTagId] = useState<number | null>(null)
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [showCompletedTasks, setShowCompletedTasks] = useState(false)
+  const [presentationMode, setPresentationMode] = useState(false)
   const { banner, showBanner, dismissBanner } = useBanner()
   const detailsSidebarRef = useRef<HTMLElement | null>(null)
 
@@ -39,12 +40,12 @@ function App() {
   )
 
   const displayedTasks = useMemo(() => {
-    if (showCompletedTasks) {
+    if (showCompletedTasks || viewType === 'focus') {
       return filteredTasks
     }
 
     return filteredTasks.filter((task) => task.status !== 'done')
-  }, [filteredTasks, showCompletedTasks])
+  }, [filteredTasks, showCompletedTasks, viewType])
 
   useEffect(() => {
     if (error) {
@@ -60,11 +61,21 @@ function App() {
   const handleUpdateTask = useCallback(
     async (taskId: number, payload: TaskUpdatePayload, successMessage: string) => {
       try {
-        await window.taskAppApi.updateTask(taskId, payload)
+        const result = await window.taskAppApi.updateTask(taskId, payload)
         await refreshWorkspaceData()
-        showBanner(successMessage, 'info')
-      } catch {
-        showBanner('Unable to update task changes.', 'error')
+
+        if (result?.conflicts && result.conflicts.length > 0) {
+          const titles = result.conflicts.map((conflict) => `"${conflict.task_title}"`).join(', ')
+          showBanner(
+            `Conflicto de Cronograma: ${titles} no se desplazaron porque están en progreso o completadas.`,
+            'warning',
+          )
+        } else {
+          showBanner(successMessage, 'info')
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to update task changes.'
+        showBanner(message, 'error')
       }
     },
     [refreshWorkspaceData, showBanner],
@@ -124,6 +135,7 @@ function App() {
         const createResult = await window.taskAppApi.createTask({
           title: title.trim(),
           type,
+          start_date: options?.startDate ?? null,
           end_date: options?.endDate ?? null,
           project_id: projectValue,
           category_id: categoryId,
@@ -350,7 +362,7 @@ function App() {
   }, [detailsOpen, handleClearDetailsView])
 
   return (
-    <div className="app-root">
+    <div className={presentationMode ? 'app-root presentation-mode' : 'app-root'}>
     <main className={detailsOpen ? 'trip-layout sidebar-open' : 'trip-layout'}>
       <SideMenu
         viewType={viewType}
@@ -383,8 +395,7 @@ function App() {
         </header>
 
         {loading && <p>Loading workspace data...</p>}
-        {error && <p className="error">{error}</p>}
-        {!loading && !error && (
+        {!loading && (
           <ViewManager
             viewType={viewType}
             tasks={displayedTasks}
@@ -399,6 +410,9 @@ function App() {
             onCreateProject={handleCreateProject}
             onCreateTag={handleCreateTag}
             onCreateCategory={handleCreateCategory}
+            onUpdateTask={handleUpdateTask}
+            presentationMode={presentationMode}
+            onTogglePresentationMode={() => setPresentationMode((value) => !value)}
           />
         )}
       </section>

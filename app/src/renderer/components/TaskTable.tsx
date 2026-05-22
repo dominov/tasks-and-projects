@@ -1,4 +1,4 @@
-import { Fragment, useState, type Dispatch, type KeyboardEvent, type ReactNode, type SetStateAction } from 'react'
+import { Fragment, useEffect, useState, type Dispatch, type KeyboardEvent, type ReactNode, type SetStateAction } from 'react'
 import type { Project, TaskWithRelations } from '../../common/types'
 import type { QuickCreateOptions } from './ViewManager'
 import { buildTaskTree, groupTasks, type GroupBy, type TaskNode } from '../utils/taskGrouping'
@@ -6,6 +6,9 @@ import { format, isToday, isTomorrow, isThisWeek } from 'date-fns';
 
 type SortField = 'title' | 'project' | 'category' | 'priority' | 'story_points' | 'status' | 'end_date'
 type TableGroupBy = GroupBy | 'none'
+
+const TABLE_GROUP_BY_STORAGE_KEY = 'task-table-group-by'
+const GOAL_GROUP_BY_STORAGE_KEY = 'goal-table-group-by'
 
 interface TaskTableProps {
   tasks: TaskWithRelations[]
@@ -29,9 +32,10 @@ function TaskTable({
   onCreateGoalSubtask,
 }: TaskTableProps) {
   const isGoalView = createType === 'goal'
+  const groupByStorageKey = isGoalView ? GOAL_GROUP_BY_STORAGE_KEY : TABLE_GROUP_BY_STORAGE_KEY
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortAsc, setSortAsc] = useState(true)
-  const [groupBy, setGroupBy] = useState<TableGroupBy>('none')
+  const [groupBy, setGroupBy] = useState<TableGroupBy>(() => readStoredGroupBy(groupByStorageKey))
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [creatingTask, setCreatingTask] = useState(false)
   const [quickDueDate, setQuickDueDate] = useState('')
@@ -60,6 +64,10 @@ function TaskTable({
     { value: 'status', label: 'Status' },
     { value: 'priority', label: 'Priority' },
   ]
+
+  useEffect(() => {
+    storeGroupBy(groupByStorageKey, groupBy)
+  }, [groupBy, groupByStorageKey])
 
   async function handleCreateNewTask(): Promise<void> {
     if (!newTaskTitle.trim()) {
@@ -229,7 +237,7 @@ function TaskTable({
                 <Fragment key={`${section.groupBy}-${section.groupLabel}`}>
                   <tr className={getGroupRowClassName(section.groupBy, section.groupLabel)}>
                     <td colSpan={7}>
-                      <strong>{section.groupTitle}</strong>
+                      <strong>{formatGroupTitle(section.groupTitle)}</strong>
                     </td>
                   </tr>
                   {section.nodes.flatMap((node) =>
@@ -416,6 +424,16 @@ function getGroupRowClassName(groupBy: GroupBy, groupLabel: string): string {
   return `group-row group-row--category group-row--${normalized || 'uncategorized'}`
 }
 
+function formatGroupTitle(groupTitle: string): string {
+  const separatorIndex = groupTitle.indexOf(':')
+
+  if (separatorIndex === -1) {
+    return groupTitle.trim()
+  }
+
+  return groupTitle.slice(separatorIndex + 1).trim()
+}
+
 function getStatusIndicatorClassName(status: TaskWithRelations['status']): string {
   if (status === 'in_progress') {
     return 'status-dot status-dot--progress'
@@ -509,6 +527,28 @@ function formatDate(dateString: string | null): string {
   if (isThisWeek(date)) return format(date, 'EEEE');
 
   return format(date, 'd MMM');
+}
+
+function readStoredGroupBy(storageKey: string): TableGroupBy {
+  if (typeof window === 'undefined') {
+    return 'none'
+  }
+
+  const value = window.localStorage.getItem(storageKey)
+
+  if (value === 'none' || value === 'category' || value === 'project' || value === 'status' || value === 'priority') {
+    return value
+  }
+
+  return 'none'
+}
+
+function storeGroupBy(storageKey: string, groupBy: TableGroupBy): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(storageKey, groupBy)
 }
 
 export default TaskTable

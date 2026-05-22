@@ -13,6 +13,7 @@ interface WorkspaceData {
   tags: Tag[]
   categories: Category[]
   loading: boolean
+  refreshing: boolean
   error: string | null
 }
 
@@ -24,6 +25,11 @@ interface UseWorkspaceDataResult extends WorkspaceData {
 /**
  * Centralized loader for all entities needed by the tripartite layout.
  * It keeps fetching concerns in one place and provides a filtered task list.
+ *
+ * `loading` is true only during the initial fetch. Subsequent refreshes (e.g.
+ * after creating/updating a task) reuse the previous data and surface their
+ * status via `refreshing`, so consumer views are not unmounted and preserve
+ * local state such as scroll position and the selected calendar week.
  */
 export function useWorkspaceData(filters: AppFilters): UseWorkspaceDataResult {
   const [data, setData] = useState<WorkspaceData>({
@@ -32,11 +38,12 @@ export function useWorkspaceData(filters: AppFilters): UseWorkspaceDataResult {
     tags: [],
     categories: [],
     loading: true,
+    refreshing: false,
     error: null,
   })
 
   const refreshWorkspaceData = useCallback(async () => {
-    setData((previous) => ({ ...previous, loading: true, error: null }))
+    setData((previous) => ({ ...previous, refreshing: true, error: null }))
 
     try {
       const [tasks, projects, tags, categories] = await Promise.all([
@@ -52,12 +59,14 @@ export function useWorkspaceData(filters: AppFilters): UseWorkspaceDataResult {
         tags,
         categories,
         loading: false,
+        refreshing: false,
         error: null,
       })
     } catch {
       setData((previous) => ({
         ...previous,
         loading: false,
+        refreshing: false,
         error: 'Unable to load local workspace data.',
       }))
     }

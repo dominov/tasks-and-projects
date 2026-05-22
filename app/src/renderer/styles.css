@@ -48,9 +48,149 @@
 }
 
 .app-banner--warning {
-  background: #b45309;
-  color: #fffbeb;
+  background: #ca8a04;
+  color: #fefce8;
 }
+
+/* ─── Weekly Calendar Styles ────────────────────────────────────── */
+.weekly-calendar {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: #f8fafc;
+  color: #0f172a;
+}
+.weekly-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+}
+.weekly-header-bar h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+.weekly-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 1.5rem;
+  min-width: 900px;
+}
+.weekly-grid-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+.weekly-days-header {
+  display: flex;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.weekly-day-col {
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.weekly-day-col:last-child {
+  border-right: none;
+}
+.weekly-day-header {
+  padding: 0.75rem;
+  text-align: center;
+}
+.weekly-day-capacity {
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  display: inline-block;
+  margin-bottom: 0.25rem;
+}
+.capacity-ok { background: #dcfce7; color: #166534; }
+.capacity-over { background: #ffedd5; color: #c2410c; }
+
+.weekly-day-body {
+  flex: 1;
+  padding: 0.5rem;
+  min-height: 500px;
+  position: relative;
+}
+
+.weekly-weekend-pattern {
+  background-image: repeating-linear-gradient(45deg, #f1f5f9 0px, #f1f5f9 10px, #f8fafc 10px, #f8fafc 20px);
+}
+
+/* For multi-day layout */
+.weekly-multi-day-layer {
+  position: absolute;
+  top: 1rem;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+.weekly-multi-day-task {
+  position: absolute;
+  pointer-events: auto;
+  background: #3b82f6;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+.weekly-single-task {
+  background: white;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+.weekly-single-task:hover {
+  border-color: #cbd5e1;
+}
+
+.add-task-btn {
+  color: #64748b;
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.5rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  width: 100%;
+}
+.add-task-btn:hover {
+  background: #f1f5f9;
+}
+.add-task-input {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #3b82f6;
+  border-radius: 0.5rem;
+  outline: none;
+}
+
 
 .app-banner--error {
   background: #b91c1c;
@@ -493,13 +633,11 @@ tbody tr:hover {
   background: #f8fafc;
   color: #1e293b;
   font-weight: 700;
+  font-size: 0.95rem;
   border-bottom: 2px solid #94a3b8;
+  border-top: 2px solid #94a3b8;
 }
 
-.group-row--category td {
-  border-left: 4px solid #64748b;
-  background: linear-gradient(90deg, rgba(226, 232, 240, 0.95) 0%, rgba(248, 250, 252, 1) 60%);
-}
 
 .group-row--development td {
   border-left-color: #4f46e5;
@@ -1170,7 +1308,8 @@ tbody tr:hover {
 }
 
 #detail-title {
-  font-size: 0.92rem;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .details-body input:focus,
@@ -1712,3 +1851,377 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Gantt view (Phase 3, Task 5) ---------- */
+
+.gantt-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  flex: 1;
+}
+
+.gantt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.gantt-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.gantt-toolbar h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.gantt-filter {
+  display: inline-flex;
+  border: 1px solid #1e293b;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.gantt-filter button {
+  background: transparent;
+  color: #cbd5e1;
+  border: 0;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.gantt-filter button.is-active {
+  background: #1d4ed8;
+  color: #f8fafc;
+}
+
+.gantt-presentation-toggle {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.gantt-presentation-toggle[aria-pressed='true'] {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.gantt-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  background: #0b1220;
+}
+
+.gantt-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+}
+
+.gantt-header-spacer {
+  flex: 0 0 auto;
+  border-right: 1px solid #1e293b;
+  background: #0f172a;
+  position: relative;
+}
+
+.gantt-panel-resizer {
+  position: absolute;
+  top: 0;
+  right: -7px;
+  width: 14px;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 250;
+  touch-action: none;
+}
+
+.gantt-panel-resizer::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 10%;
+  width: 2px;
+  height: 80%;
+  border-radius: 2px;
+  background: #475569;
+  opacity: 0.9;
+}
+
+.gantt-panel-resizer:hover::after,
+.gantt-panel-resizer.is-dragging::after {
+  background: #93c5fd;
+}
+
+.gantt-header-cells {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-month-row {
+  display: flex;
+  border-bottom: 1px solid #1e293b;
+}
+
+.gantt-month-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: capitalize;
+  padding: 0.2rem 0;
+  border-right: 1px solid #1e293b;
+}
+
+.gantt-day-row {
+  display: flex;
+}
+
+.gantt-day-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  padding: 0.2rem 0;
+}
+
+.gantt-day-cell.is-weekend {
+  color: #64748b;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(148, 163, 184, 0.08) 0,
+    rgba(148, 163, 184, 0.08) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.gantt-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-row {
+  display: flex;
+  border-bottom: 1px solid #111827;
+}
+
+.gantt-row-label {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.6rem;
+  border-right: 1px solid #1e293b;
+  background: #0b1220;
+  position: sticky;
+  left: 0;
+  z-index: 150;
+}
+
+.gantt-row-label-content {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.gantt-row-expander {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.gantt-row-expander:hover {
+  color: #e2e8f0;
+}
+
+.gantt-row-expander-placeholder {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.gantt-row-title {
+  background: transparent;
+  border: 0;
+  color: #e2e8f0;
+  padding: 0;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-row-title.is-active {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.gantt-row.is-goal .gantt-row-title {
+  font-weight: 700;
+}
+
+.gantt-row-track {
+  position: relative;
+  flex: 1;
+}
+
+.gantt-cell {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}
+
+.gantt-cell.is-weekend {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(148, 163, 184, 0.07) 0,
+    rgba(148, 163, 184, 0.07) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.gantt-bar {
+  position: absolute;
+  border-radius: 6px;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  font-size: 0.78rem;
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  user-select: none;
+  touch-action: none;
+}
+
+.gantt-bar.is-dragging {
+  cursor: grabbing;
+  opacity: 0.85;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.gantt-bar.is-selected {
+  outline: 2px solid #fbbf24;
+  outline-offset: 1px;
+}
+
+.gantt-bar.is-goal {
+  opacity: 0.9;
+  cursor: default;
+}
+
+.gantt-bar-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.gantt-bar-handle {
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 0 6px 6px 0;
+  margin-right: -0.6rem;
+  margin-left: 0.4rem;
+  touch-action: none;
+}
+
+.gantt-milestone-row {
+  position: relative;
+  height: 26px;
+  background: #0a101c;
+  border-bottom: 1px solid #1e293b;
+}
+
+.gantt-milestone-bracket {
+  position: absolute;
+  top: 4px;
+  height: 18px;
+  border: 2px solid;
+  border-radius: 4px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.gantt-milestone-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Presentation mode (Phase 3, Task 6) ---------- */
+
+.app-root.presentation-mode .side-menu,
+.app-root.presentation-mode .details-sidebar {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-root.presentation-mode .canvas-head {
+  display: none;
+}
+
+.app-root.presentation-mode .trip-layout,
+.app-root.presentation-mode .trip-layout.sidebar-open {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+  transition: grid-template-columns 220ms ease;
+}
+
+.app-root.presentation-mode .main-canvas {
+  grid-column: 2 / 3;
+  padding: 0.5rem 1rem;
+}
+

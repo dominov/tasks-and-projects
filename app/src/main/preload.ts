@@ -3,6 +3,10 @@ import type {
   CategoryCreatePayload,
   CategoryCreateResult,
   Category,
+  CustomFreeDay,
+  CustomFreeDayPayload,
+  Dependency,
+  DependencyPayload,
   ProjectCreatePayload,
   ProjectCreateResult,
   Project,
@@ -12,12 +16,13 @@ import type {
   TaskCreatePayload,
   TaskCreateResult,
   TaskUpdatePayload,
+  TaskUpdateResult,
   TaskWithRelations,
 } from '../common/types'
 
 const taskAppApi = {
   listTasks: (): Promise<TaskWithRelations[]> => ipcRenderer.invoke('tasks:list'),
-  updateTask: (taskId: number, payload: TaskUpdatePayload): Promise<void> =>
+  updateTask: (taskId: number, payload: TaskUpdatePayload): Promise<TaskUpdateResult> =>
     ipcRenderer.invoke('tasks:update', taskId, payload),
   deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
   createTask: (payload: TaskCreatePayload): Promise<TaskCreateResult> => ipcRenderer.invoke('tasks:create', payload),
@@ -35,6 +40,14 @@ const taskAppApi = {
     ipcRenderer.invoke('categories:create', payload),
   deleteCategory: (categoryId: number, keepAssociatedTasks: boolean): Promise<void> =>
     ipcRenderer.invoke('categories:delete', categoryId, keepAssociatedTasks),
+  listDependencies: (): Promise<Dependency[]> => ipcRenderer.invoke('dependencies:list'),
+  addDependency: (payload: DependencyPayload): Promise<void> =>
+    ipcRenderer.invoke('dependencies:add', payload),
+  removeDependency: (payload: DependencyPayload): Promise<void> =>
+    ipcRenderer.invoke('dependencies:remove', payload),
+  listFreeDays: (): Promise<CustomFreeDay[]> => ipcRenderer.invoke('freeDays:list'),
+  addFreeDay: (payload: CustomFreeDayPayload): Promise<void> => ipcRenderer.invoke('freeDays:add', payload),
+  removeFreeDay: (date: string): Promise<void> => ipcRenderer.invoke('freeDays:remove', date),
 }
 
 contextBridge.exposeInMainWorld('taskAppApi', taskAppApi)

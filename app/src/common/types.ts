@@ -116,3 +116,29 @@ export interface Dependency {
   task_id: number
   depends_on_task_id: number
 }
+
+/** Conflict surfaced by the dependency cascade engine. */
+export interface DependencyCascadeConflict {
+  task_id: number
+  task_title: string
+  reason: 'in_progress' | 'done'
+}
+
+export interface TaskUpdateResult {
+  conflicts: DependencyCascadeConflict[]
+}
+
+export interface CustomFreeDay {
+  date: string
+  note: string | null
+}
+
+export interface CustomFreeDayPayload {
+  date: string
+  note?: string | null
+}
+
+export interface DependencyPayload {
+  task_id: number
+  depends_on_task_id: number
+}

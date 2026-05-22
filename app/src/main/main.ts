@@ -1,11 +1,23 @@
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { DATABASE_FILE_NAME, DEFAULT_DEV_SERVER_URL } from '../common/constants'
+import {
+  addBusinessDays,
+  getBusinessDaysDistance,
+  parseIsoDate,
+  toIsoDate as toBusinessIsoDate,
+} from '../common/businessDays'
 import type {
   CategoryCreatePayload,
   CategoryCreateResult,
   Category,
+  CustomFreeDay,
+  CustomFreeDayPayload,
+  Dependency,
+  DependencyCascadeConflict,
+  DependencyPayload,
   ProjectCreatePayload,
   ProjectCreateResult,
   Project,
@@ -17,6 +29,7 @@ import type {
   TaskStatus,
   TaskType,
   TaskUpdatePayload,
+  TaskUpdateResult,
   TaskWithRelations,
 } from '../common/types'
 import { applyMigrations, openDatabase, type AppDatabase } from '../database/db'
@@ -96,7 +109,7 @@ function registerIpcHandlers(database: AppDatabase): void {
     `)
   })
 
-  ipcMain.handle('tasks:update', (_event, rawTaskId: number, payload: TaskUpdatePayload): void => {
+  ipcMain.handle('tasks:update', (_event, rawTaskId: number, payload: TaskUpdatePayload): TaskUpdateResult => {
     const taskId = Number(rawTaskId)
 
     if (!Number.isInteger(taskId) || taskId <= 0) {
@@ -105,6 +118,36 @@ function registerIpcHandlers(database: AppDatabase): void {
 
     const currentTask = database.first<TaskWithRelations>(`SELECT * FROM tasks WHERE id = ${taskId}`)
     if (!currentTask) throw new Error('Task not found')
+
+    if (
+      payload.start_date !== undefined &&
+      payload.end_date !== undefined &&
+      payload.start_date &&
+      payload.end_date &&
+      payload.start_date > payload.end_date
+    ) {
+      throw new Error('Start date cannot be after end date')
+    }
+
+    if (
+      payload.start_date !== undefined &&
+      payload.start_date &&
+      payload.end_date === undefined &&
+      currentTask.end_date &&
+      payload.start_date > currentTask.end_date
+    ) {
+      throw new Error('Start date cannot be after end date')
+    }
+
+    if (
+      payload.end_date !== undefined &&
+      payload.end_date &&
+      payload.start_date === undefined &&
+      currentTask.start_date &&
+      currentTask.start_date > payload.end_date
+    ) {
+      throw new Error('End date cannot be before start date')
+    }
 
     const setClauses: string[] = []
     let statusChangedToDone = false
@@ -315,6 +358,19 @@ function registerIpcHandlers(database: AppDatabase): void {
     if (updatedTask?.type === 'goal') {
       recalculateGoalBounds(database, taskId)
     }
+
+    // Cascade dependency shift when this task's end_date moved.
+    let conflicts: DependencyCascadeConflict[] = []
+
+    if (endDateChanged) {
+      const refreshed = database.first<TaskWithRelations>(`SELECT * FROM tasks WHERE id = ${taskId}`)
+
+      if (refreshed?.end_date) {
+        conflicts = cascadeDependencyShift(database, taskId, refreshed.end_date)
+      }
+    }
+
+    return { conflicts }
   })
 
   ipcMain.handle('tasks:delete', (_event, rawTaskId: number): void => {
@@ -618,6 +674,91 @@ function registerIpcHandlers(database: AppDatabase): void {
     statements.push(`DELETE FROM categories WHERE id = ${categoryId};`)
     database.transaction(statements)
   })
+
+  // --- Dependencies ----------------------------------------------------------
+
+  ipcMain.handle('dependencies:list', (): Dependency[] => {
+    return database.query<Dependency>(
+      'SELECT task_id, depends_on_task_id FROM dependencies ORDER BY task_id ASC, depends_on_task_id ASC',
+    )
+  })
+
+  ipcMain.handle('dependencies:add', (_event, payload: DependencyPayload): void => {
+    const taskId = Number(payload?.task_id)
+    const dependsOnId = Number(payload?.depends_on_task_id)
+
+    if (!Number.isInteger(taskId) || taskId <= 0) {
+      throw new Error('Invalid task ID')
+    }
+
+    if (!Number.isInteger(dependsOnId) || dependsOnId <= 0) {
+      throw new Error('Invalid predecessor task ID')
+    }
+
+    if (taskId === dependsOnId) {
+      throw new Error('A task cannot depend on itself')
+    }
+
+    if (!database.first<{ id: number }>(`SELECT id FROM tasks WHERE id = ${taskId} LIMIT 1;`)) {
+      throw new Error('Task not found')
+    }
+
+    if (!database.first<{ id: number }>(`SELECT id FROM tasks WHERE id = ${dependsOnId} LIMIT 1;`)) {
+      throw new Error('Predecessor task not found')
+    }
+
+    if (wouldCreateDependencyCycle(database, taskId, dependsOnId)) {
+      throw new Error('Adding this dependency would create a cycle')
+    }
+
+    database.execute(
+      `INSERT OR IGNORE INTO dependencies (task_id, depends_on_task_id) VALUES (${taskId}, ${dependsOnId});`,
+    )
+  })
+
+  ipcMain.handle('dependencies:remove', (_event, payload: DependencyPayload): void => {
+    const taskId = Number(payload?.task_id)
+    const dependsOnId = Number(payload?.depends_on_task_id)
+
+    if (!Number.isInteger(taskId) || taskId <= 0 || !Number.isInteger(dependsOnId) || dependsOnId <= 0) {
+      throw new Error('Invalid dependency identifiers')
+    }
+
+    database.execute(
+      `DELETE FROM dependencies WHERE task_id = ${taskId} AND depends_on_task_id = ${dependsOnId};`,
+    )
+  })
+
+  // --- Custom free days ------------------------------------------------------
+
+  ipcMain.handle('freeDays:list', (): CustomFreeDay[] => {
+    return database.query<CustomFreeDay>('SELECT date, note FROM custom_free_days ORDER BY date ASC')
+  })
+
+  ipcMain.handle('freeDays:add', (_event, payload: CustomFreeDayPayload): void => {
+    const date = String(payload?.date ?? '').trim()
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Free day must be a YYYY-MM-DD date')
+    }
+
+    const note = payload?.note ?? null
+    const noteSql = note === null ? 'NULL' : `'${escapeSqlString(note)}'`
+
+    database.execute(
+      `INSERT INTO custom_free_days (date, note) VALUES ('${date}', ${noteSql}) ON CONFLICT(date) DO UPDATE SET note = ${noteSql};`,
+    )
+  })
+
+  ipcMain.handle('freeDays:remove', (_event, rawDate: string): void => {
+    const date = String(rawDate ?? '').trim()
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Free day must be a YYYY-MM-DD date')
+    }
+
+    database.execute(`DELETE FROM custom_free_days WHERE date = '${date}';`)
+  })
 }
 
 function buildTaskDeletionStatements(taskFilterSql: string): string[] {
@@ -821,21 +962,213 @@ function recalculateGoalBounds(database: AppDatabase, taskId: number): void {
     return
   }
 
-  const bounds = database.first<{ min_start_date: string | null; max_end_date: string | null }>(`
+  const bounds = database.first<{
+    min_start_date: string | null
+    fallback_start_date: string | null
+    max_end_date: string | null
+  }>(`
     SELECT
       MIN(start_date) AS min_start_date,
+      MIN(end_date) AS fallback_start_date,
       MAX(end_date) AS max_end_date
     FROM tasks
     WHERE parent_task_id = ${taskId};
   `)
 
+  const nextGoalStartDate = bounds?.min_start_date ?? bounds?.fallback_start_date ?? null
+
   database.execute(`
     UPDATE tasks
     SET
-      start_date = ${bounds?.min_start_date ? `'${escapeSqlString(bounds.min_start_date)}'` : 'NULL'},
+      start_date = ${nextGoalStartDate ? `'${escapeSqlString(nextGoalStartDate)}'` : 'NULL'},
       end_date = ${bounds?.max_end_date ? `'${escapeSqlString(bounds.max_end_date)}'` : 'NULL'}
     WHERE id = ${taskId};
   `)
+}
+
+// --- Dependency cascade engine ---------------------------------------------
+
+interface CascadeTaskRow {
+  id: number
+  title: string
+  start_date: string | null
+  end_date: string | null
+  status: TaskStatus
+}
+
+/**
+ * Walk the dependency graph downstream from `predecessorId` and shift every
+ * successor whose predecessor now ends on `predecessorEndDateIso`. The whole
+ * batch is committed inside one atomic transaction; if any statement fails,
+ * `database.transaction` rolls back so the original cronograma stays intact.
+ *
+ * Successors with status `in_progress` or `done` are not shifted: the branch
+ * is stopped and surfaced as a `DependencyCascadeConflict` for the renderer
+ * to display ("Conflicto de Cronograma").
+ */
+function cascadeDependencyShift(
+  database: AppDatabase,
+  predecessorId: number,
+  predecessorEndDateIso: string,
+): DependencyCascadeConflict[] {
+  const freeDays = loadFreeDaySet(database)
+  const conflicts: DependencyCascadeConflict[] = []
+  const statements: string[] = []
+  const visited = new Set<number>([predecessorId])
+
+  type Frame = { taskId: number; endDateIso: string }
+  const queue: Frame[] = [{ taskId: predecessorId, endDateIso: predecessorEndDateIso }]
+
+  while (queue.length > 0) {
+    const { taskId, endDateIso } = queue.shift() as Frame
+
+    const successors = database.query<{ task_id: number }>(
+      `SELECT task_id FROM dependencies WHERE depends_on_task_id = ${taskId};`,
+    )
+
+    for (const { task_id: successorId } of successors) {
+      if (visited.has(successorId)) {
+        continue
+      }
+      visited.add(successorId)
+
+      const successor = database.first<CascadeTaskRow>(
+        `SELECT id, title, start_date, end_date, status FROM tasks WHERE id = ${successorId} LIMIT 1;`,
+      )
+
+      if (!successor) {
+        continue
+      }
+
+      if (successor.status === 'in_progress' || successor.status === 'done') {
+        conflicts.push({
+          task_id: successor.id,
+          task_title: successor.title,
+          reason: successor.status,
+        })
+        continue
+      }
+
+      const predecessorEndDate = parseIsoDate(endDateIso)
+      const nextStartDate = addBusinessDays(predecessorEndDate, 1, freeDays)
+
+      const originalDuration = successor.start_date && successor.end_date
+        ? Math.max(1, getBusinessDaysDistance(parseIsoDate(successor.start_date), parseIsoDate(successor.end_date), freeDays))
+        : 1
+
+      const nextEndDate = addBusinessDays(nextStartDate, originalDuration - 1, freeDays)
+      const nextStartIso = toBusinessIsoDate(nextStartDate)
+      const nextEndIso = toBusinessIsoDate(nextEndDate)
+
+      if (nextStartIso === successor.start_date && nextEndIso === successor.end_date) {
+        // No movement needed but still propagate in case downstream chain was already shifted.
+        queue.push({ taskId: successor.id, endDateIso: nextEndIso })
+        continue
+      }
+
+      statements.push(
+        `UPDATE tasks SET start_date = '${nextStartIso}', end_date = '${nextEndIso}' WHERE id = ${successor.id};`,
+      )
+
+      queue.push({ taskId: successor.id, endDateIso: nextEndIso })
+    }
+  }
+
+  if (statements.length > 0) {
+    database.transaction(statements)
+  }
+
+  return conflicts
+}
+
+/**
+ * Returns true if adding the edge `successorId` depends on `predecessorId`
+ * would close a cycle. We DFS forward from `successorId` (following its own
+ * successors) and check whether we ever reach `predecessorId`.
+ */
+function wouldCreateDependencyCycle(
+  database: AppDatabase,
+  successorId: number,
+  predecessorId: number,
+): boolean {
+  if (successorId === predecessorId) {
+    return true
+  }
+
+  const stack: number[] = [successorId]
+  const seen = new Set<number>([successorId])
+
+  while (stack.length > 0) {
+    const current = stack.pop() as number
+    const children = database.query<{ task_id: number }>(
+      `SELECT task_id FROM dependencies WHERE depends_on_task_id = ${current};`,
+    )
+
+    for (const { task_id: childId } of children) {
+      if (childId === predecessorId) {
+        return true
+      }
+      if (!seen.has(childId)) {
+        seen.add(childId)
+        stack.push(childId)
+      }
+    }
+  }
+
+  return false
+}
+
+// --- Holiday/free-day loader -----------------------------------------------
+
+let cachedHolidayDates: ReadonlySet<string> | null = null
+
+function loadColombiaHolidays(): ReadonlySet<string> {
+  if (cachedHolidayDates) {
+    return cachedHolidayDates
+  }
+
+  const candidatePaths = [
+    path.resolve(process.cwd(), 'src', 'common', 'colombia-holidays.json'),
+    path.join(__dirname, 'colombia-holidays.json'),
+    path.join(__dirname, '..', 'src', 'common', 'colombia-holidays.json'),
+  ]
+
+  for (const candidate of candidatePaths) {
+    if (!existsSync(candidate)) {
+      continue
+    }
+
+    try {
+      const raw = readFileSync(candidate, 'utf8')
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const valid = parsed.filter(
+          (value): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value),
+        )
+        cachedHolidayDates = new Set(valid)
+        return cachedHolidayDates
+      }
+    } catch (error) {
+      console.warn('Failed to read colombia-holidays.json', error)
+    }
+  }
+
+  cachedHolidayDates = new Set<string>()
+  return cachedHolidayDates
+}
+
+function loadFreeDaySet(database: AppDatabase): ReadonlySet<string> {
+  const holidays = loadColombiaHolidays()
+  const custom = database.query<{ date: string }>('SELECT date FROM custom_free_days;')
+  const set = new Set<string>(holidays)
+
+  for (const { date } of custom) {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      set.add(date)
+    }
+  }
+
+  return set
 }
 
 // --- End Helpers ---

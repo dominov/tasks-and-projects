@@ -242,6 +242,11 @@ function TaskDetailsSidebar({
       return
     }
 
+    const endDate = draft.endDate || null
+    if (nextStartDate && endDate && nextStartDate > endDate) {
+      return
+    }
+
     void persistUpdate({ start_date: nextStartDate }, 'Start date updated.')
   }
 
@@ -253,6 +258,11 @@ function TaskDetailsSidebar({
     const nextDueDate = value || null
 
     if ((selectedTask.end_date ?? null) === nextDueDate) {
+      return
+    }
+
+    const startDate = draft.startDate || null
+    if (startDate && nextDueDate && startDate > nextDueDate) {
       return
     }
 
@@ -346,6 +356,18 @@ function TaskDetailsSidebar({
             <p className="muted">Selected task ID: {selectedTask.id} | Created at: {formatCreatedAt(selectedTask.created_at)}</p>
             <hr className="detail-separator" />
 
+            <div className="detail-field">
+              <label className="detail-label" htmlFor="detail-title">Title:</label>
+              <input
+                id="detail-title"
+                className="detail-title-input"
+                value={draft.title}
+                onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+                onBlur={(event) => maybeCommitTextField('title', event.target.value)}
+                placeholder="Task title"
+              />
+            </div>
+
             <section className="status-section">
               <p className="status-title">Status Switch</p>
               <div className="status-switch" role="group" aria-label="Task status updates">
@@ -361,17 +383,6 @@ function TaskDetailsSidebar({
                 ))}
               </div>
             </section>
-
-            <div className="detail-field">
-              <label className="detail-label" htmlFor="detail-title">Title:</label>
-              <input
-                id="detail-title"
-                value={draft.title}
-                onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                onBlur={(event) => maybeCommitTextField('title', event.target.value)}
-                placeholder="Task title"
-              />
-            </div>
 
             <div className="detail-field">
               <label className="detail-label" htmlFor="detail-description">Description:</label>
@@ -393,8 +404,8 @@ function TaskDetailsSidebar({
                 onChange={(event) => {
                   const nextValue = event.target.value === '' ? null : Number(event.target.value)
                   setDraft((current) => ({ ...current, projectId: nextValue }))
+                  maybeCommitProject(nextValue)
                 }}
-                onBlur={(event) => maybeCommitProject(event.target.value === '' ? null : Number(event.target.value))}
               >
                 <option value="">No project</option>
                 {projects.map((project) => (
@@ -413,8 +424,8 @@ function TaskDetailsSidebar({
                 onChange={(event) => {
                   const nextValue = event.target.value === '' ? null : Number(event.target.value)
                   setDraft((current) => ({ ...current, categoryId: nextValue }))
+                  maybeCommitCategory(nextValue)
                 }}
-                onBlur={(event) => maybeCommitCategory(event.target.value === '' ? null : Number(event.target.value))}
               >
                 <option value="">No category</option>
                 {categories.map((category) => (
@@ -433,8 +444,8 @@ function TaskDetailsSidebar({
                 onChange={(event) => {
                   const nextType = event.target.value as TaskType
                   setDraft((current) => ({ ...current, type: nextType }))
+                  maybeCommitType(nextType)
                 }}
-                onBlur={(event) => maybeCommitType(event.target.value as TaskType)}
               >
                 <option value="task">Task</option>
                 <option value="goal">Goal</option>
@@ -487,11 +498,12 @@ function TaskDetailsSidebar({
                   type="date"
                   value={draft.startDate}
                   disabled={draft.type === 'goal'}
+                  max={draft.endDate || undefined}
                   onChange={(event) => {
                     const nextStartDate = event.target.value
                     setDraft((current) => ({ ...current, startDate: nextStartDate }))
+                    maybeCommitStartDate(nextStartDate)
                   }}
-                  onBlur={(event) => maybeCommitStartDate(event.target.value)}
                 />
               </div>
               <div className="detail-field">
@@ -501,11 +513,12 @@ function TaskDetailsSidebar({
                   type="date"
                   value={draft.endDate}
                   disabled={draft.type === 'goal'}
+                  min={draft.startDate || undefined}
                   onChange={(event) => {
                     const nextEndDate = event.target.value
                     setDraft((current) => ({ ...current, endDate: nextEndDate }))
+                    maybeCommitDueDate(nextEndDate)
                   }}
-                  onBlur={(event) => maybeCommitDueDate(event.target.value)}
                 />
               </div>
             </div>

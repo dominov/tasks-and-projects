@@ -26,7 +26,6 @@ interface SideMenuProps {
 type IconName = 'calendar-days' | 'check-square' | 'target' | 'calendar' | 'chart' | 'focus' | 'plus' | 'trash'
 
 const viewMenu: Array<{ id: ViewType; label: string; icon: IconName }> = [
-  { id: 'today', label: 'Today', icon: 'calendar-days' },
   { id: 'focus', label: 'Focus', icon: 'focus' },
   { id: 'tasks', label: 'My Tasks', icon: 'check-square' },
   { id: 'goals', label: 'Goals', icon: 'target' },

@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react'
-import type { Project, TaskWithRelations } from '../../common/types'
+import type { Project, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
 import TableView from '../views/TableView'
-import TodayView from '../views/TodayView'
 import FocusView from '../views/FocusView'
 import CreateCategoryView from '../views/CreateCategoryView'
 import CreateProjectView from '../views/CreateProjectView'
@@ -10,7 +9,6 @@ import CreateTagView from '../views/CreateTagView'
 export type ViewType =
   | 'tasks'
   | 'goals'
-  | 'today'
   | 'focus'
   | 'calendar'
   | 'gantt'
@@ -19,6 +17,7 @@ export type ViewType =
   | 'create-category'
 
 export interface QuickCreateOptions {
+  startDate?: string | null
   endDate?: string | null
   priority?: 1 | 2 | 3
   projectId?: number | null
@@ -38,6 +37,9 @@ interface ViewManagerProps {
   onCreateProject: (name: string, color: string) => Promise<void>
   onCreateTag: (name: string, color: string) => Promise<void>
   onCreateCategory: (name: string) => Promise<void>
+  onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
+  presentationMode: boolean
+  onTogglePresentationMode: () => void
 }
 
 const CalendarView = lazy(() => import('../views/CalendarView'))
@@ -57,6 +59,9 @@ function ViewManager({
   onCreateProject,
   onCreateTag,
   onCreateCategory,
+  onUpdateTask,
+  presentationMode,
+  onTogglePresentationMode,
 }: ViewManagerProps) {
   const objectiveTasks = getObjectiveScopedTasks(tasks)
 
@@ -94,9 +99,6 @@ function ViewManager({
     )
   }
 
-  if (viewType === 'today') {
-    return <TodayView tasks={tasks} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
-  }
 
   if (viewType === 'focus') {
     return <FocusView tasks={tasks} projects={projects} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
@@ -117,9 +119,23 @@ function ViewManager({
   return (
     <Suspense fallback={<p>Loading view...</p>}>
       {viewType === 'calendar' ? (
-        <CalendarView tasks={tasks} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
+        <CalendarView
+          tasks={tasks}
+          onSelectTask={onSelectTask}
+          selectedTaskId={selectedTaskId}
+          onCreateTask={onCreateTask}
+          projectId={projectId}
+        />
       ) : (
-        <GanttView tasks={tasks} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
+        <GanttView
+          tasks={tasks}
+          projects={projects}
+          onSelectTask={onSelectTask}
+          selectedTaskId={selectedTaskId}
+          onUpdateTask={onUpdateTask}
+          presentationMode={presentationMode}
+          onTogglePresentationMode={onTogglePresentationMode}
+        />
       )}
     </Suspense>
   )
