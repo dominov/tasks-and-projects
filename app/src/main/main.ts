@@ -773,6 +773,9 @@ function ensureTaskMetadataColumns(database: AppDatabase): void {
   const columns = database.query<{ name: string }>('PRAGMA table_info(tasks);')
   const hasCreatedAtColumn = columns.some((column) => column.name === 'created_at')
   const hasTypeColumn = columns.some((column) => column.name === 'type')
+  const hasRecurrenceColumn = columns.some((column) => column.name === 'recurrence')
+  const hasRecurrenceRuleColumn = columns.some((column) => column.name === 'recurrence_rule')
+  const hasPreviousRecurrentIdColumn = columns.some((column) => column.name === 'previous_recurrent_id')
 
   if (!hasCreatedAtColumn) {
     database.execute('ALTER TABLE tasks ADD COLUMN created_at TEXT;')
@@ -782,8 +785,21 @@ function ensureTaskMetadataColumns(database: AppDatabase): void {
     database.execute("ALTER TABLE tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'task' CHECK(type IN ('task', 'goal'));")
   }
 
+  if (!hasRecurrenceColumn) {
+    database.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none' CHECK(recurrence IN ('none', 'weekly', 'monthly'));")
+  }
+
+  if (!hasRecurrenceRuleColumn) {
+    database.execute('ALTER TABLE tasks ADD COLUMN recurrence_rule TEXT;')
+  }
+
+  if (!hasPreviousRecurrentIdColumn) {
+    database.execute('ALTER TABLE tasks ADD COLUMN previous_recurrent_id INTEGER;')
+  }
+
   database.execute("UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL;")
   database.execute("UPDATE tasks SET type = 'task' WHERE type IS NULL OR type NOT IN ('task', 'goal');")
+  database.execute("UPDATE tasks SET recurrence = 'none' WHERE recurrence IS NULL OR recurrence NOT IN ('none', 'weekly', 'monthly');")
 }
 
 function escapeSqlString(value: string): string {
