@@ -54,7 +54,7 @@ function createEmptyDraft(): TaskDraft {
     description: '',
     status: 'todo',
     type: 'task',
-    priority: 2,
+    priority: 1,
     storyPoints: 1,
     startDate: '',
     endDate: '',

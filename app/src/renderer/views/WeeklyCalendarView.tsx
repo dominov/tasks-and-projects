@@ -13,6 +13,8 @@ import { isWorkingDay } from '../utils/dateUtils';
 import type { Project, TaskWithRelations } from '../../common/types';
 import type { QuickCreateOptions } from '../components/ViewManager';
 
+const MULTI_DAY_ROW_HEIGHT_REM = 3.35;
+
 interface WeeklyCalendarViewProps {
   tasks: TaskWithRelations[];
   projects: Project[];
@@ -61,6 +63,16 @@ function taskOverlapsWeek(task: TaskWithRelations, weekStart: Date, weekEnd: Dat
 function isMultiDay(task: TaskWithRelations): boolean {
   if (!task.start_date || !task.end_date) return false;
   return task.start_date !== task.end_date;
+}
+
+function getPriorityTone(priority: number | null | undefined): 'low' | 'medium' | 'high' {
+  if (priority === 3) {
+    return 'high';
+  }
+  if (priority === 1) {
+    return 'low';
+  }
+  return 'medium';
 }
 
 export default function WeeklyCalendarView({
@@ -198,7 +210,54 @@ export default function WeeklyCalendarView({
   };
 
   // Dynamic spacer height based on number of multi-day tasks visible
-  const multiDaySpacerHeight = `${Math.max(4, multiDayTasks.length * 3 + 1)}rem`;
+  const multiDayTaskLayouts = useMemo(() => {
+    const indexed = multiDayTasks
+      .map((task) => {
+        const { visualStartIdx, visualEndIdx } = getVisualIndices(task);
+        return {
+          task,
+          startIdx: visualStartIdx,
+          endIdx: visualEndIdx,
+        };
+      })
+      .sort((a, b) => {
+        if (a.startIdx !== b.startIdx) {
+          return a.startIdx - b.startIdx;
+        }
+
+        const aDuration = a.endIdx - a.startIdx;
+        const bDuration = b.endIdx - b.startIdx;
+        return bDuration - aDuration;
+      });
+
+    const lanesLastEndIdx: number[] = [];
+
+    return indexed.map((entry) => {
+      let lane = lanesLastEndIdx.findIndex((lastEnd) => entry.startIdx > lastEnd);
+
+      if (lane === -1) {
+        lane = lanesLastEndIdx.length;
+        lanesLastEndIdx.push(entry.endIdx);
+      } else {
+        lanesLastEndIdx[lane] = entry.endIdx;
+      }
+
+      return {
+        ...entry,
+        lane,
+      };
+    });
+  }, [multiDayTasks, weekDays, weekEnd, weekStart]);
+
+  const multiDayLaneCount = useMemo(() => {
+    if (multiDayTaskLayouts.length === 0) {
+      return 0;
+    }
+
+    return Math.max(...multiDayTaskLayouts.map((entry) => entry.lane)) + 1;
+  }, [multiDayTaskLayouts]);
+
+  const multiDaySpacerHeight = `${Math.max(4, multiDayLaneCount * MULTI_DAY_ROW_HEIGHT_REM + 0.9)}rem`;
 
   return (
     <div className="weekly-grid">
@@ -238,22 +297,22 @@ export default function WeeklyCalendarView({
             
           {/* Multi-day Task Layer */}
           <div className="weekly-multi-day-layer">
-            {multiDayTasks.map((task, index) => {
-                const { visualStartIdx, visualEndIdx } = getVisualIndices(task);
-                const { left, width } = getTotalWidthPercentage(visualStartIdx, visualEndIdx);
+            {multiDayTaskLayouts.map(({ task, startIdx, endIdx, lane }) => {
+              const { left, width } = getTotalWidthPercentage(startIdx, endIdx);
               const goalSubtitle = goalTitleByTaskId.get(task.id);
               const projectColor = task.project_id ? projectColorMap.get(task.project_id) ?? '#3b82f6' : '#3b82f6';
+              const priorityTone = getPriorityTone(task.priority);
 
                 return (
                     <div 
                         key={task.id} 
-                        className="weekly-multi-day-task"
+                        className={`weekly-multi-day-task weekly-task--priority-${priorityTone}`}
                         data-details-trigger="open"
                         style={{ 
                             left, 
                             width, 
-                            top: `${index * 3}rem`, 
-                          backgroundColor: projectColor
+                            top: `${lane * MULTI_DAY_ROW_HEIGHT_REM}rem`,
+                          borderLeft: `4px solid ${projectColor}`,
                         }}
                         onClick={() => onSelectTask(task.id)}
                     >
@@ -285,10 +344,11 @@ export default function WeeklyCalendarView({
                   {dayTasks.map((task) => {
                     const goalSubtitle = goalTitleByTaskId.get(task.id);
                     const projectColor = task.project_id ? projectColorMap.get(task.project_id) ?? '#94a3b8' : '#94a3b8';
+                    const priorityTone = getPriorityTone(task.priority);
                     return (
                       <div
                         key={task.id}
-                        className="weekly-single-task"
+                        className={`weekly-single-task weekly-task--priority-${priorityTone}`}
                         data-details-trigger="open"
                         onClick={() => onSelectTask(task.id)}
                         style={{

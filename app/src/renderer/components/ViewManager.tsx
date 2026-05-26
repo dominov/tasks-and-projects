@@ -27,6 +27,7 @@ export interface QuickCreateOptions {
 interface ViewManagerProps {
   viewType: ViewType
   tasks: TaskWithRelations[]
+  lastCreatedTaskId: number | null
   projects: Project[]
   categories: Category[]
   tags: Tag[]
@@ -56,6 +57,7 @@ const GanttView = lazy(() => import('../views/GanttView'))
 function ViewManager({
   viewType,
   tasks,
+  lastCreatedTaskId,
   projects,
   categories,
   tags,
@@ -81,6 +83,7 @@ function ViewManager({
     return (
       <TableView
         tasks={tasks}
+        lastCreatedTaskId={lastCreatedTaskId}
         projects={projects}
         categories={categories}
         tags={tags}
@@ -103,6 +106,7 @@ function ViewManager({
         description="Objectives and tasks linked to each objective."
         createType="goal"
         tasks={objectiveTasks}
+        lastCreatedTaskId={lastCreatedTaskId}
         projects={projects}
         categories={categories}
         tags={tags}

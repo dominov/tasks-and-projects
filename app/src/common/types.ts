@@ -13,6 +13,7 @@ export interface Project {
 export interface Category {
   id: number
   name: string
+  color: string
   created_at: string
 }
 
@@ -91,6 +92,11 @@ export interface ProjectCreatePayload {
   color: string
 }
 
+export interface ProjectUpdatePayload {
+  name?: string
+  color?: string
+}
+
 export interface ProjectCreateResult {
   projectId: number
 }
@@ -100,12 +106,22 @@ export interface TagCreatePayload {
   color: string
 }
 
+export interface TagUpdatePayload {
+  name?: string
+  color?: string
+}
+
 export interface TagCreateResult {
   tagId: number
 }
 
 export interface CategoryCreatePayload {
   name: string
+}
+
+export interface CategoryUpdatePayload {
+  name?: string
+  color?: string
 }
 
 export interface CategoryCreateResult {

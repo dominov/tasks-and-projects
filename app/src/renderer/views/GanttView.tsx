@@ -1,9 +1,10 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   parseIsoDate,
   toIsoDate,
 } from '../../common/businessDays'
 import type { Project, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
+import { getGroupLabel, getGroupLabelHeading, type GroupBy } from '../utils/taskGrouping'
 
 interface GanttViewProps {
   tasks: TaskWithRelations[]
@@ -21,14 +22,14 @@ interface GanttViewProps {
 
 const ROW_HEIGHT = 36
 const BAR_VERTICAL_PADDING = 6
-const MIN_WEEKDAY_WIDTH = 24
+const MIN_WEEKDAY_WIDTH = 35
 const WEEKEND_WIDTH_RATIO = 0.5
 const HEADER_HEIGHT = 56
 const DEFAULT_SIDE_PANEL_WIDTH = 220
 const MIN_SIDE_PANEL_WIDTH = 180
 const MAX_SIDE_PANEL_WIDTH = 560
-const DAYS_BEFORE_TODAY = 30
-const DAYS_AFTER_TODAY = 60
+const DAYS_BEFORE_TODAY = 7
+const DAYS_AFTER_LATEST_TASK = 3
 const CLICK_SUPPRESSION_MS = 250
 
 interface DayCell {
@@ -52,6 +53,13 @@ interface GanttRow {
   task: TaskWithRelations
   level: number
   hasChildren: boolean
+}
+
+interface GanttGroupSection {
+  groupBy: GroupBy
+  groupLabel: string
+  groupTitle: string
+  rows: GanttRow[]
 }
 
 interface DragState {
@@ -83,6 +91,7 @@ function GanttView({
   const [panelResize, setPanelResize] = useState<PanelResizeState | null>(null)
   const [sidePanelWidth, setSidePanelWidth] = useState(DEFAULT_SIDE_PANEL_WIDTH)
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
+  const [groupBy, setGroupBy] = useState<GroupBy>('status')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const suppressedClickRef = useRef<{ taskId: number | null; until: number }>({
     taskId: null,
@@ -158,7 +167,7 @@ function GanttView({
     return map
   }, [tasks])
 
-  const rows = useMemo<GanttRow[]>(() => {
+  const groupedRows = useMemo<GanttGroupSection[]>(() => {
     if (goalTasks.length === 0) {
       return []
     }
@@ -169,38 +178,94 @@ function GanttView({
       return aIso.localeCompare(bIso)
     })
 
-    const result: GanttRow[] = []
-    const pushChildren = (parentId: number, level: number) => {
-      const children = childrenByParent.get(parentId) ?? []
-      for (const child of children) {
-        const childRows = childrenByParent.get(child.id) ?? []
-        const hasChildren = childRows.length > 0
-        result.push({ task: child, level, hasChildren })
-        const isExpanded = expandedRows[child.id] ?? true
-        if (hasChildren && isExpanded) {
-          pushChildren(child.id, level + 1)
+    const buildBranchRows = (goal: TaskWithRelations): GanttRow[] => {
+      const branchRows: GanttRow[] = []
+
+      const pushChildren = (parentId: number, level: number) => {
+        const children = childrenByParent.get(parentId) ?? []
+        for (const child of children) {
+          const childRows = childrenByParent.get(child.id) ?? []
+          const hasChildren = childRows.length > 0
+          branchRows.push({ task: child, level, hasChildren })
+          const isExpanded = expandedRows[child.id] ?? true
+          if (hasChildren && isExpanded) {
+            pushChildren(child.id, level + 1)
+          }
         }
       }
-    }
 
-    for (const goal of sortedGoals) {
       const goalChildren = childrenByParent.get(goal.id) ?? []
       const hasChildren = goalChildren.length > 0
-      result.push({ task: goal, level: 0, hasChildren })
+      branchRows.push({ task: goal, level: 0, hasChildren })
       const isExpanded = expandedRows[goal.id] ?? true
       if (hasChildren && isExpanded) {
         pushChildren(goal.id, 1)
       }
+
+      return branchRows
     }
 
-    return result
-  }, [childrenByParent, expandedRows, goalTasks])
+    const groups = new Map<string, GanttGroupSection>()
 
-  // Build a fixed window: 30 days before today and 60 days after today.
+    for (const goal of sortedGoals) {
+      const groupLabel = getEffectiveGroupLabel(goal, groupBy, childrenByParent)
+      const groupTitle = `${getGroupLabelHeading(groupBy)}: ${groupLabel}`
+      const existing = groups.get(groupLabel)
+
+      if (existing) {
+        existing.rows.push(...buildBranchRows(goal))
+      } else {
+        groups.set(groupLabel, {
+          groupBy,
+          groupLabel,
+          groupTitle,
+          rows: buildBranchRows(goal),
+        })
+      }
+    }
+
+    return Array.from(groups.values()).sort((left, right) => {
+      const leftIsFallback = isFallbackGroupLabel(left.groupLabel)
+      const rightIsFallback = isFallbackGroupLabel(right.groupLabel)
+
+      if (leftIsFallback !== rightIsFallback) {
+        return leftIsFallback ? 1 : -1
+      }
+
+      return left.groupLabel.localeCompare(right.groupLabel)
+    })
+  }, [childrenByParent, expandedRows, goalTasks, groupBy])
+
+  const rows = useMemo<GanttRow[]>(() => groupedRows.flatMap((section) => section.rows), [groupedRows])
+
+  // Build window: one week before today until the latest task date + 3 days.
   const days = useMemo<DayCell[]>(() => {
     const today = new Date()
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - DAYS_BEFORE_TODAY)
-    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + DAYS_AFTER_TODAY)
+
+    let latestTaskDate: Date | null = null
+    for (const task of datedTasks) {
+      const candidateIso = task.end_date ?? task.start_date
+      if (!candidateIso) {
+        continue
+      }
+
+      const candidateDate = parseIsoDate(candidateIso)
+      if (!latestTaskDate || candidateDate.getTime() > latestTaskDate.getTime()) {
+        latestTaskDate = candidateDate
+      }
+    }
+
+    const todayFloor = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const latestPlusBuffer = latestTaskDate
+      ? new Date(
+          latestTaskDate.getFullYear(),
+          latestTaskDate.getMonth(),
+          latestTaskDate.getDate() + DAYS_AFTER_LATEST_TASK,
+        )
+      : todayFloor
+
+    const end = latestPlusBuffer.getTime() > todayFloor.getTime() ? latestPlusBuffer : todayFloor
 
     const cells: DayCell[] = []
     const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate())
@@ -236,7 +301,7 @@ function GanttView({
     }
 
     return cells
-  }, [containerWidth, sidePanelWidth])
+  }, [containerWidth, datedTasks, sidePanelWidth])
 
   const totalTimelineWidth = days.length > 0 ? days[days.length - 1].offset + days[days.length - 1].width : 0
 
@@ -275,6 +340,22 @@ function GanttView({
       return { row, task, startIdx: safeStart, endIdx: safeEnd, left, width }
     })
   }, [days, indexByIso, rows])
+
+  const rowOrderByTaskId = useMemo(() => {
+    const map = new Map<number, number>()
+    rows.forEach((row, index) => {
+      map.set(row.task.id, index)
+    })
+    return map
+  }, [rows])
+
+  const positionedByTaskId = useMemo(() => {
+    const map = new Map<number, PositionedTask>()
+    positionedTasks.forEach((entry) => {
+      map.set(entry.task.id, entry)
+    })
+    return map
+  }, [positionedTasks])
 
   // --- Drag & resize ---------------------------------------------------------
 
@@ -458,6 +539,20 @@ function GanttView({
       <header className="gantt-toolbar">
         <div className="gantt-toolbar-left">
           <h2>Goals timeline</h2>
+          <div className="gantt-group-controls">
+            <label htmlFor="gantt-group-by">Group:</label>
+            <select
+              id="gantt-group-by"
+              className="gantt-group-select"
+              value={groupBy}
+              onChange={(event) => setGroupBy(event.target.value as GroupBy)}
+            >
+              <option value="status">Status</option>
+              <option value="category">Category</option>
+              <option value="project">Project</option>
+              <option value="priority">Priority</option>
+            </select>
+          </div>
         </div>
         <button
           type="button"
@@ -484,101 +579,120 @@ function GanttView({
             />
 
             <div className="gantt-body">
-              {positionedTasks.map((entry, rowIndex) => {
-                const { task, row, left, width } = entry
-                const projectColor = task.project_id ? projectColorById.get(task.project_id) ?? '#475569' : '#475569'
-                const durationDays = getTaskDurationDays(task)
-                const isDragging = dragState?.taskId === task.id
-                const adjustedLeft = isDragging && dragState?.mode === 'move' ? left + liveDeltaPx : left
-                const adjustedWidth =
-                  isDragging && dragState?.mode === 'resize' ? Math.max(MIN_WEEKDAY_WIDTH, width + liveDeltaPx) : width
-                const isGoal = task.type === 'goal'
-                const isExpanded = expandedRows[task.id] ?? true
+              {groupedRows.map((section) => (
+                <Fragment key={`${section.groupBy}-${section.groupLabel}`}>
+                  {groupedRows.length > 1 ? (
+                    <div className="gantt-group-row">
+                      <div className="gantt-group-row-label" style={{ width: sidePanelWidth }}>
+                        {section.groupTitle}
+                      </div>
+                      <div className="gantt-group-row-track" />
+                    </div>
+                  ) : null}
 
-                const handleBarClick = (event: React.MouseEvent<HTMLDivElement>) => {
-                  event.stopPropagation()
+                  {section.rows.map((row) => {
+                    const task = row.task
+                    const entry = positionedByTaskId.get(task.id)
 
-                  const suppressed = suppressedClickRef.current
-                  if (suppressed.taskId === task.id && Date.now() <= suppressed.until) {
-                    suppressedClickRef.current = { taskId: null, until: 0 }
-                    return
-                  }
+                    if (!entry) {
+                      return null
+                    }
 
-                  onSelectTask(task.id)
-                }
+                    const { left, width } = entry
+                    const rowIndex = rowOrderByTaskId.get(task.id) ?? 0
+                    const projectColor = task.project_id ? projectColorById.get(task.project_id) ?? '#475569' : '#475569'
+                    const durationDays = getTaskDurationDays(task)
+                    const isDragging = dragState?.taskId === task.id
+                    const adjustedLeft = isDragging && dragState?.mode === 'move' ? left + liveDeltaPx : left
+                    const adjustedWidth =
+                      isDragging && dragState?.mode === 'resize' ? Math.max(MIN_WEEKDAY_WIDTH, width + liveDeltaPx) : width
+                    const isGoal = task.type === 'goal'
+                    const isExpanded = expandedRows[task.id] ?? true
 
-                return (
-                  <div className={`gantt-row${isGoal ? ' is-goal' : ''}`} key={task.id} style={{ height: ROW_HEIGHT }}>
-                    <div className="gantt-row-label" style={{ width: sidePanelWidth }}>
-                      <div className="gantt-row-label-content" style={{ paddingLeft: `${row.level * 14}px` }}>
-                        {row.hasChildren ? (
-                          <button
-                            type="button"
-                            className="gantt-row-expander"
-                            onClick={() => toggleExpanded(task.id)}
-                            aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
-                            title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                    const handleBarClick = (event: React.MouseEvent<HTMLDivElement>) => {
+                      event.stopPropagation()
+
+                      const suppressed = suppressedClickRef.current
+                      if (suppressed.taskId === task.id && Date.now() <= suppressed.until) {
+                        suppressedClickRef.current = { taskId: null, until: 0 }
+                        return
+                      }
+
+                      onSelectTask(task.id)
+                    }
+
+                    return (
+                      <div className={`gantt-row${isGoal ? ' is-goal' : ''}`} key={task.id} style={{ height: ROW_HEIGHT }}>
+                        <div className="gantt-row-label" style={{ width: sidePanelWidth }}>
+                          <div className="gantt-row-label-content" style={{ paddingLeft: `${row.level * 14}px` }}>
+                            {row.hasChildren ? (
+                              <button
+                                type="button"
+                                className="gantt-row-expander"
+                                onClick={() => toggleExpanded(task.id)}
+                                aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                              >
+                                {isExpanded ? '▾' : '▸'}
+                              </button>
+                            ) : (
+                              <span className="gantt-row-expander-placeholder" aria-hidden="true" />
+                            )}
+                            <button
+                              type="button"
+                              className={selectedTaskId === task.id ? 'gantt-row-title is-active' : 'gantt-row-title'}
+                              onClick={() => onSelectTask(task.id)}
+                              title={task.title}
+                            >
+                              {task.title}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="gantt-row-track" style={{ height: ROW_HEIGHT }}>
+                          {days.map((cell, idx) => (
+                            <div
+                              key={cell.iso}
+                              className={`gantt-cell${cell.isWeekend ? ' is-weekend' : ''}`}
+                              style={{
+                                left: cell.offset,
+                                width: cell.width,
+                                height: ROW_HEIGHT,
+                                zIndex: idx,
+                              }}
+                              aria-hidden="true"
+                            />
+                          ))}
+                          <div
+                            className={`gantt-bar${isDragging ? ' is-dragging' : ''}${
+                              selectedTaskId === task.id ? ' is-selected' : ''
+                            }${isGoal ? ' is-goal' : ''}`}
+                            style={{
+                              left: adjustedLeft,
+                              width: adjustedWidth,
+                              top: BAR_VERTICAL_PADDING,
+                              height: ROW_HEIGHT - BAR_VERTICAL_PADDING * 2,
+                              background: projectColor,
+                              zIndex: 100 + rowIndex,
+                            }}
+                            onPointerDown={(event) => beginDrag(event, task, 'move')}
+                            onClick={handleBarClick}
                           >
-                            {isExpanded ? '▾' : '▸'}
-                          </button>
-                        ) : (
-                          <span className="gantt-row-expander-placeholder" aria-hidden="true" />
-                        )}
-                        <button
-                          type="button"
-                          className={
-                            selectedTaskId === task.id ? 'gantt-row-title is-active' : 'gantt-row-title'
-                          }
-                          onClick={() => onSelectTask(task.id)}
-                          title={task.title}
-                        >
-                          {task.title}
-                        </button>
+                            <span className="gantt-bar-label">{durationDays} day{durationDays === 1 ? '' : 's'}</span>
+                            {!isGoal ? (
+                              <span
+                                className="gantt-bar-handle"
+                                onPointerDown={(event) => beginDrag(event, task, 'resize')}
+                                aria-label="Resize end date"
+                                role="button"
+                              />
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="gantt-row-track" style={{ height: ROW_HEIGHT }}>
-                      {days.map((cell, idx) => (
-                        <div
-                          key={cell.iso}
-                          className={`gantt-cell${cell.isWeekend ? ' is-weekend' : ''}`}
-                          style={{
-                            left: cell.offset,
-                            width: cell.width,
-                            height: ROW_HEIGHT,
-                            zIndex: idx,
-                          }}
-                          aria-hidden="true"
-                        />
-                      ))}
-                      <div
-                        className={`gantt-bar${isDragging ? ' is-dragging' : ''}${
-                          selectedTaskId === task.id ? ' is-selected' : ''
-                        }${isGoal ? ' is-goal' : ''}`}
-                        style={{
-                          left: adjustedLeft,
-                          width: adjustedWidth,
-                          top: BAR_VERTICAL_PADDING,
-                          height: ROW_HEIGHT - BAR_VERTICAL_PADDING * 2,
-                          background: projectColor,
-                          zIndex: 100 + rowIndex,
-                        }}
-                        onPointerDown={(event) => beginDrag(event, task, 'move')}
-                        onClick={handleBarClick}
-                      >
-                        <span className="gantt-bar-label">{durationDays} day{durationDays === 1 ? '' : 's'}</span>
-                        {!isGoal ? (
-                          <span
-                            className="gantt-bar-handle"
-                            onPointerDown={(event) => beginDrag(event, task, 'resize')}
-                            aria-label="Resize end date"
-                            role="button"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </Fragment>
+              ))}
             </div>
           </div>
         </div>
@@ -666,6 +780,46 @@ function getTaskDurationDays(task: TaskWithRelations): number {
   const end = parseIsoDate(endIso).getTime()
   const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1
   return Math.max(1, days)
+}
+
+function isFallbackGroupLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase()
+  return normalized.startsWith('no ') || normalized === 'none' || normalized === '-'
+}
+
+function getEffectiveGroupLabel(
+  goal: TaskWithRelations,
+  groupBy: GroupBy,
+  childrenByParent: Map<number, TaskWithRelations[]>,
+): string {
+  const directLabel = getGroupLabel(goal, groupBy)
+
+  // Goals often don't carry project/category, while their subtasks do.
+  // Use the first descendant with a non-fallback label so grouping stays meaningful.
+  if (groupBy !== 'project' && groupBy !== 'category') {
+    return directLabel
+  }
+
+  if (!isFallbackGroupLabel(directLabel)) {
+    return directLabel
+  }
+
+  const queue: TaskWithRelations[] = [...(childrenByParent.get(goal.id) ?? [])]
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (!current) {
+      continue
+    }
+
+    const label = getGroupLabel(current, groupBy)
+    if (!isFallbackGroupLabel(label)) {
+      return label
+    }
+
+    queue.push(...(childrenByParent.get(current.id) ?? []))
+  }
+
+  return directLabel
 }
 
 export default GanttView

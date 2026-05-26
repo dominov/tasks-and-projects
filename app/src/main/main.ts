@@ -12,6 +12,7 @@ import {
 import type {
   CategoryCreatePayload,
   CategoryCreateResult,
+  CategoryUpdatePayload,
   Category,
   CustomFreeDay,
   CustomFreeDayPayload,
@@ -20,9 +21,11 @@ import type {
   DependencyPayload,
   ProjectCreatePayload,
   ProjectCreateResult,
+  ProjectUpdatePayload,
   Project,
   TagCreatePayload,
   TagCreateResult,
+  TagUpdatePayload,
   Tag,
   TaskCreatePayload,
   TaskCreateResult,
@@ -74,10 +77,27 @@ async function ensureDatabaseReady(): Promise<AppDatabase> {
   const database = await openDatabase(dbFilePath)
   applyMigrations(database)
   ensureTaskMetadataColumns(database)
+  ensureCategoryMetadataColumns(database)
   return database
 }
 
 function registerIpcHandlers(database: AppDatabase): void {
+  ipcMain.handle('dialogs:confirm-keep-associated', async (): Promise<boolean> => {
+    const focusedWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined
+    const result = await dialog.showMessageBox(focusedWindow, {
+      type: 'question',
+      title: 'Keep Associated Tasks',
+      message: 'Keep associated tasks?',
+      detail: 'Choose Keep to preserve associated tasks, or delete to remove them too.',
+      buttons: ['Keep', 'delete'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+
+    return result.response === 0
+  })
+
   ipcMain.handle('tasks:list', (): TaskWithRelations[] => {
     return database.query<TaskWithRelations>(`
       SELECT
@@ -606,6 +626,40 @@ function registerIpcHandlers(database: AppDatabase): void {
     return { projectId: row.projectId }
   })
 
+  ipcMain.handle('projects:update', (_event, rawProjectId: number, payload: ProjectUpdatePayload): void => {
+    const projectId = Number(rawProjectId)
+
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      throw new Error('Invalid project ID')
+    }
+
+    const setClauses: string[] = []
+
+    if (typeof payload.name === 'string') {
+      const name = payload.name.trim()
+
+      if (!name) {
+        throw new Error('Project name is required')
+      }
+
+      setClauses.push(`name = '${escapeSqlString(name)}'`)
+    }
+
+    if (typeof payload.color === 'string') {
+      setClauses.push(`color = '${normalizeHexColor(payload.color)}'`)
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No project fields to update')
+    }
+
+    database.execute(`
+      UPDATE projects
+      SET ${setClauses.join(', ')}
+      WHERE id = ${projectId};
+    `)
+  })
+
   ipcMain.handle('projects:delete', (_event, rawProjectId: number, keepAssociatedTasks: boolean): void => {
     const projectId = Number(rawProjectId)
 
@@ -650,6 +704,40 @@ function registerIpcHandlers(database: AppDatabase): void {
     return { tagId: row.tagId }
   })
 
+  ipcMain.handle('tags:update', (_event, rawTagId: number, payload: TagUpdatePayload): void => {
+    const tagId = Number(rawTagId)
+
+    if (!Number.isInteger(tagId) || tagId <= 0) {
+      throw new Error('Invalid tag ID')
+    }
+
+    const setClauses: string[] = []
+
+    if (typeof payload.name === 'string') {
+      const name = payload.name.trim()
+
+      if (!name) {
+        throw new Error('Tag name is required')
+      }
+
+      setClauses.push(`name = '${escapeSqlString(name)}'`)
+    }
+
+    if (typeof payload.color === 'string') {
+      setClauses.push(`color = '${normalizeHexColor(payload.color)}'`)
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No tag fields to update')
+    }
+
+    database.execute(`
+      UPDATE tags
+      SET ${setClauses.join(', ')}
+      WHERE id = ${tagId};
+    `)
+  })
+
   ipcMain.handle('tags:delete', (_event, rawTagId: number, keepAssociatedTasks: boolean): void => {
     const tagId = Number(rawTagId)
 
@@ -672,7 +760,7 @@ function registerIpcHandlers(database: AppDatabase): void {
   })
 
   ipcMain.handle('categories:list', (): Category[] => {
-    return database.query<Category>('SELECT id, name, created_at FROM categories ORDER BY name ASC')
+    return database.query<Category>("SELECT id, name, COALESCE(color, '#64748b') AS color, created_at FROM categories ORDER BY name ASC")
   })
 
   ipcMain.handle('categories:create', (_event, payload: CategoryCreatePayload): CategoryCreateResult => {
@@ -683,8 +771,8 @@ function registerIpcHandlers(database: AppDatabase): void {
     }
 
     database.execute(`
-      INSERT INTO categories (name, created_at)
-      VALUES ('${escapeSqlString(name)}', datetime('now'));
+      INSERT INTO categories (name, color, created_at)
+      VALUES ('${escapeSqlString(name)}', '#64748b', datetime('now'));
     `)
 
     const row = database.first<{ categoryId: number }>('SELECT last_insert_rowid() AS categoryId')
@@ -694,6 +782,40 @@ function registerIpcHandlers(database: AppDatabase): void {
     }
 
     return { categoryId: row.categoryId }
+  })
+
+  ipcMain.handle('categories:update', (_event, rawCategoryId: number, payload: CategoryUpdatePayload): void => {
+    const categoryId = Number(rawCategoryId)
+
+    if (!Number.isInteger(categoryId) || categoryId <= 0) {
+      throw new Error('Invalid category ID')
+    }
+
+    const setClauses: string[] = []
+
+    if (typeof payload.name === 'string') {
+      const name = payload.name.trim()
+
+      if (!name) {
+        throw new Error('Category name is required')
+      }
+
+      setClauses.push(`name = '${escapeSqlString(name)}'`)
+    }
+
+    if (typeof payload.color === 'string') {
+      setClauses.push(`color = '${normalizeHexColor(payload.color)}'`)
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No category fields to update')
+    }
+
+    database.execute(`
+      UPDATE categories
+      SET ${setClauses.join(', ')}
+      WHERE id = ${categoryId};
+    `)
   })
 
   ipcMain.handle('categories:delete', (_event, rawCategoryId: number, keepAssociatedTasks: boolean): void => {
@@ -885,6 +1007,17 @@ function ensureTaskMetadataColumns(database: AppDatabase): void {
   database.execute("UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL;")
   database.execute("UPDATE tasks SET type = 'task' WHERE type IS NULL OR type NOT IN ('task', 'goal');")
   database.execute("UPDATE tasks SET recurrence = 'none' WHERE recurrence IS NULL OR recurrence NOT IN ('none', 'weekly', 'monthly');")
+}
+
+function ensureCategoryMetadataColumns(database: AppDatabase): void {
+  const columns = database.query<{ name: string }>("PRAGMA table_info('categories');")
+  const hasColorColumn = columns.some((column) => column.name === 'color')
+
+  if (!hasColorColumn) {
+    database.execute("ALTER TABLE categories ADD COLUMN color TEXT NOT NULL DEFAULT '#64748b';")
+  }
+
+  database.execute("UPDATE categories SET color = '#64748b' WHERE color IS NULL OR TRIM(color) = '';")
 }
 
 function escapeSqlString(value: string): string {

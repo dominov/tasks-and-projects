@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Category, Project, Tag } from '../../common/types'
 import type { ViewType } from './ViewManager'
 
@@ -22,24 +23,43 @@ interface SideMenuProps {
   onDeleteProject: (project: Project) => void
   onDeleteTag: (tag: Tag) => void
   onDeleteCategory: (category: Category) => void
+  onUpdateProject: (projectId: number, payload: { name?: string; color?: string }) => Promise<void>
+  onUpdateTag: (tagId: number, payload: { name?: string; color?: string }) => Promise<void>
+  onUpdateCategory: (categoryId: number, payload: { name?: string; color?: string }) => Promise<void>
   onExportData: () => void
   onImportData: () => void
 }
 
-type IconName = 'calendar-days' | 'check-square' | 'target' | 'calendar' | 'chart' | 'focus' | 'plus' | 'trash'
+type IconName =
+  | 'calendar-days'
+  | 'check-square'
+  | 'target'
+  | 'calendar'
+  | 'chart'
+  | 'focus'
+  | 'plus'
+  | 'trash'
+  | 'portfolio'
+
+type EntityContextMenuState =
+  | { x: number; y: number; kind: 'project'; entity: Project }
+  | { x: number; y: number; kind: 'tag'; entity: Tag }
+  | { x: number; y: number; kind: 'category'; entity: Category }
 
 const viewMenu: Array<{ id: ViewType; label: string; icon: IconName }> = [
   { id: 'focus', label: 'Focus', icon: 'focus' },
   { id: 'tasks', label: 'My Tasks', icon: 'check-square' },
-  { id: 'goals', label: 'Goals', icon: 'target' },
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+  { id: 'goals', label: 'Goals', icon: 'target' },
   { id: 'gantt', label: 'Gantt', icon: 'chart' },
 ]
 
-function SidebarIcon({ name }: { name: IconName }) {
+function SidebarIcon({ name, className }: { name: IconName; className?: string }) {
+  const iconClassName = className ? `menu-icon ${className}` : 'menu-icon'
+
   if (name === 'calendar-days') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
         <rect x="3" y="4" width="18" height="17" rx="2" />
         <line x1="8" y1="2.5" x2="8" y2="6.5" />
         <line x1="16" y1="2.5" x2="16" y2="6.5" />
@@ -50,7 +70,7 @@ function SidebarIcon({ name }: { name: IconName }) {
 
   if (name === 'check-square') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <polyline points="8,12 11,15 16,9" />
       </svg>
@@ -59,7 +79,7 @@ function SidebarIcon({ name }: { name: IconName }) {
 
   if (name === 'target') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
         <circle cx="12" cy="12" r="8" />
         <circle cx="12" cy="12" r="4" />
         <circle cx="12" cy="12" r="1" />
@@ -69,7 +89,7 @@ function SidebarIcon({ name }: { name: IconName }) {
 
   if (name === 'calendar') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
         <rect x="3" y="4" width="18" height="17" rx="2" />
         <line x1="8" y1="2.5" x2="8" y2="6.5" />
         <line x1="16" y1="2.5" x2="16" y2="6.5" />
@@ -80,7 +100,7 @@ function SidebarIcon({ name }: { name: IconName }) {
 
   if (name === 'chart') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
         <line x1="4" y1="20" x2="20" y2="20" />
         <rect x="6" y="11" width="3" height="9" rx="1" />
         <rect x="11" y="7" width="3" height="13" rx="1" />
@@ -89,9 +109,19 @@ function SidebarIcon({ name }: { name: IconName }) {
     )
   }
 
+  if (name === 'portfolio') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
+        <rect x="3" y="7" width="18" height="13" rx="2" />
+        <path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2" />
+        <path d="M3 12h18" />
+      </svg>
+    )
+  }
+
   if (name === 'plus') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon menu-icon--mini">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
         <line x1="12" y1="5" x2="12" y2="19" />
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
@@ -100,14 +130,21 @@ function SidebarIcon({ name }: { name: IconName }) {
 
   if (name === 'focus') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
+        <polygon
+          points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     )
   }
 
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon menu-icon--mini">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={iconClassName}>
       <path d="M4 7h16" />
       <path d="M9 7V5h6v2" />
       <path d="M7 7l1 12h8l1-12" />
@@ -118,7 +155,6 @@ function SidebarIcon({ name }: { name: IconName }) {
 function SideMenu({
   viewType,
   projects,
-
   categories,
   tags,
   showCompletedTasks,
@@ -137,9 +173,221 @@ function SideMenu({
   onDeleteProject,
   onDeleteTag,
   onDeleteCategory,
+  onUpdateProject,
+  onUpdateTag,
+  onUpdateCategory,
   onExportData,
   onImportData,
 }: SideMenuProps) {
+  const [contextMenu, setContextMenu] = useState<EntityContextMenuState | null>(null)
+  const [nameDraft, setNameDraft] = useState('')
+  const [isUpdatingName, setIsUpdatingName] = useState(false)
+  const [colorDraft, setColorDraft] = useState('#64748b')
+  const [isUpdatingColor, setIsUpdatingColor] = useState(false)
+  const contextMenuRef = useRef<HTMLDivElement | null>(null)
+  const colorAutoSaveTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return
+    }
+
+    setNameDraft(contextMenu.entity.name)
+    setColorDraft(getValidHexColor(contextMenu.entity.color))
+
+    function closeOnPointerDown(event: MouseEvent): void {
+      const target = event.target
+
+      if (
+        contextMenuRef.current &&
+        target instanceof Node &&
+        contextMenuRef.current.contains(target)
+      ) {
+        return
+      }
+
+      setContextMenu(null)
+    }
+
+    function closeOnEscape(event: KeyboardEvent): void {
+      if (event.key === 'Escape') {
+        setContextMenu(null)
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnPointerDown)
+    document.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnPointerDown)
+      document.removeEventListener('keydown', closeOnEscape)
+
+      if (colorAutoSaveTimeoutRef.current !== null) {
+        window.clearTimeout(colorAutoSaveTimeoutRef.current)
+        colorAutoSaveTimeoutRef.current = null
+      }
+    }
+  }, [contextMenu])
+
+  function openContextMenu(
+    event: ReactMouseEvent<HTMLDivElement | HTMLButtonElement>,
+    nextContextMenu: EntityContextMenuState,
+  ): void {
+    event.preventDefault()
+    setContextMenu(nextContextMenu)
+  }
+
+  async function updateContextMenuName(nextName: string): Promise<void> {
+    if (!contextMenu) {
+      return
+    }
+
+    const trimmedName = nextName.trim()
+
+    if (!trimmedName) {
+      window.alert('Name cannot be empty.')
+      return
+    }
+
+    if (trimmedName === contextMenu.entity.name) {
+      return
+    }
+
+    setIsUpdatingName(true)
+
+    try {
+      if (contextMenu.kind === 'project') {
+        await onUpdateProject(contextMenu.entity.id, { name: trimmedName })
+      } else if (contextMenu.kind === 'tag') {
+        await onUpdateTag(contextMenu.entity.id, { name: trimmedName })
+      } else {
+        await onUpdateCategory(contextMenu.entity.id, { name: trimmedName })
+      }
+
+      setContextMenu((previous) => {
+        if (!previous) {
+          return previous
+        }
+
+        if (previous.kind === 'project') {
+          return {
+            ...previous,
+            entity: {
+              ...previous.entity,
+              name: trimmedName,
+            },
+          }
+        }
+
+        if (previous.kind === 'tag') {
+          return {
+            ...previous,
+            entity: {
+              ...previous.entity,
+              name: trimmedName,
+            },
+          }
+        }
+
+        return {
+          ...previous,
+          entity: {
+            ...previous.entity,
+            name: trimmedName,
+          },
+        }
+      })
+    } catch {
+      window.alert('Unable to rename item.')
+    } finally {
+      setIsUpdatingName(false)
+    }
+  }
+
+  async function saveColorFromContextMenu(nextColor: string): Promise<void> {
+    setIsUpdatingColor(true)
+
+    try {
+      if (!contextMenu) {
+        return
+      }
+
+      if (contextMenu.kind === 'project') {
+        await onUpdateProject(contextMenu.entity.id, { color: nextColor })
+      } else if (contextMenu.kind === 'tag') {
+        await onUpdateTag(contextMenu.entity.id, { color: nextColor })
+      } else {
+        await onUpdateCategory(contextMenu.entity.id, { color: nextColor })
+      }
+
+      setContextMenu((previous) => {
+        if (!previous) {
+          return previous
+        }
+
+        if (previous.kind === 'project') {
+          return {
+            ...previous,
+            entity: {
+              ...previous.entity,
+              color: nextColor,
+            },
+          }
+        }
+
+        if (previous.kind === 'tag') {
+          return {
+            ...previous,
+            entity: {
+              ...previous.entity,
+              color: nextColor,
+            },
+          }
+        }
+
+        return {
+          ...previous,
+          entity: {
+            ...previous.entity,
+            color: nextColor,
+          },
+        }
+      })
+    } catch {
+      window.alert('Unable to update color. Use #RRGGBB format.')
+    } finally {
+      setIsUpdatingColor(false)
+    }
+  }
+
+  function handleColorDraftChange(nextDraft: string): void {
+    setColorDraft(nextDraft)
+
+    if (!contextMenu) {
+      return
+    }
+
+    const normalizedDraft = nextDraft.trim().toLowerCase()
+
+    if (!isHexColor(normalizedDraft)) {
+      return
+    }
+
+    const currentColor = getValidHexColor(contextMenu.entity.color)
+
+    if (normalizedDraft === currentColor) {
+      return
+    }
+
+    if (colorAutoSaveTimeoutRef.current !== null) {
+      window.clearTimeout(colorAutoSaveTimeoutRef.current)
+    }
+
+    colorAutoSaveTimeoutRef.current = window.setTimeout(() => {
+      void saveColorFromContextMenu(normalizedDraft)
+    }, 180)
+  }
+
   return (
     <aside className="side-menu">
       <div className="menu-top">
@@ -187,29 +435,47 @@ function SideMenu({
           All Projects
         </button>
         {projects.map((project) => (
-          <div key={project.id} className="entity-chip-row">
+          <div
+            key={project.id}
+            className="entity-chip-row"
+            onContextMenu={(event) =>
+              openContextMenu(event, {
+                x: event.clientX,
+                y: event.clientY,
+                kind: 'project',
+                entity: project,
+              })
+            }
+          >
             <button
               type="button"
               className={selectedProjectId === project.id ? 'chip active' : 'chip'}
               onClick={() => onSelectProject(project.id)}
+              onContextMenu={(event) =>
+                openContextMenu(event, {
+                  x: event.clientX,
+                  y: event.clientY,
+                  kind: 'project',
+                  entity: project,
+                })
+              }
             >
-              <span
-                className="dot"
-                aria-hidden="true"
-                style={{
-                  backgroundColor: project.color,
-                  borderColor: project.color,
-                }}
-              />
+              <span className="project-chip-icon-wrap" style={{ color: project.color }}>
+                <SidebarIcon name="portfolio" className="project-chip-icon" />
+              </span>
               {project.name}
             </button>
-            <button type="button" className="chip-delete" onClick={() => onDeleteProject(project)} aria-label="Delete project">
+            <button
+              type="button"
+              className="chip-delete"
+              onClick={() => onDeleteProject(project)}
+              aria-label="Delete project"
+            >
               <SidebarIcon name="trash" />
             </button>
           </div>
         ))}
       </section>
-
 
       <section className="menu-section">
         <div className="menu-section-title-row">
@@ -227,21 +493,45 @@ function SideMenu({
           All Categories
         </button>
         {categories.map((category) => (
-          <div key={category.id} className="entity-chip-row">
+          <div
+            key={category.id}
+            className="entity-chip-row"
+            onContextMenu={(event) =>
+              openContextMenu(event, {
+                x: event.clientX,
+                y: event.clientY,
+                kind: 'category',
+                entity: category,
+              })
+            }
+          >
             <button
               type="button"
               className={selectedCategoryId === category.id ? 'chip active' : 'chip'}
               onClick={() => onSelectCategory(category.id)}
+              onContextMenu={(event) =>
+                openContextMenu(event, {
+                  x: event.clientX,
+                  y: event.clientY,
+                  kind: 'category',
+                  entity: category,
+                })
+              }
             >
               {category.name}
             </button>
-            <button type="button" className="chip-delete" onClick={() => onDeleteCategory(category)} aria-label="Delete category">
+            <button
+              type="button"
+              className="chip-delete"
+              onClick={() => onDeleteCategory(category)}
+              aria-label="Delete category"
+            >
               <SidebarIcon name="trash" />
             </button>
           </div>
         ))}
       </section>
-      
+
       <section className="menu-section">
         <div className="menu-section-title-row">
           <h3>Tags</h3>
@@ -258,17 +548,40 @@ function SideMenu({
           All Tags
         </button>
         {tags.map((tag) => (
-          <div key={tag.id} className="entity-chip-row">
+          <div
+            key={tag.id}
+            className="entity-chip-row"
+            onContextMenu={(event) =>
+              openContextMenu(event, {
+                x: event.clientX,
+                y: event.clientY,
+                kind: 'tag',
+                entity: tag,
+              })
+            }
+          >
             <button
               type="button"
               className={selectedTagId === tag.id ? 'chip active' : 'chip'}
               onClick={() => onSelectTag(tag.id)}
+              onContextMenu={(event) =>
+                openContextMenu(event, {
+                  x: event.clientX,
+                  y: event.clientY,
+                  kind: 'tag',
+                  entity: tag,
+                })
+              }
             >
-              <span className={`dot project-dot--tone-${tag.id % 6}`} aria-hidden="true" />
               <span className="tag-prefix">#</span>
               {tag.name}
             </button>
-            <button type="button" className="chip-delete" onClick={() => onDeleteTag(tag)} aria-label="Delete tag">
+            <button
+              type="button"
+              className="chip-delete"
+              onClick={() => onDeleteTag(tag)}
+              aria-label="Delete tag"
+            >
               <SidebarIcon name="trash" />
             </button>
           </div>
@@ -308,8 +621,75 @@ function SideMenu({
           </button>
         </div>
       </section>
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="side-menu-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <div className="side-menu-context-menu__field">
+            <label htmlFor="side-menu-context-name">Name</label>
+            <div className="side-menu-context-menu__name-row">
+              <input
+                id="side-menu-context-name"
+                type="text"
+                className="side-menu-context-menu__text-input"
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    void updateContextMenuName(nameDraft)
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void updateContextMenuName(nameDraft)}
+                disabled={isUpdatingName}
+              >
+                {isUpdatingName ? 'Saving...' : 'Rename'}
+              </button>
+            </div>
+          </div>
+          <div className="side-menu-context-menu__color">
+            <label htmlFor="side-menu-context-color">Color</label>
+            <div className="side-menu-context-menu__color-row">
+              <input
+                id="side-menu-context-color"
+                type="color"
+                value={getValidHexColor(colorDraft)}
+                onChange={(event) => handleColorDraftChange(event.target.value)}
+              />
+              <input
+                type="text"
+                className="side-menu-context-menu__hex-input"
+                value={colorDraft}
+                onChange={(event) => handleColorDraftChange(event.target.value)}
+                placeholder="#64748b"
+              />
+            </div>
+            {isUpdatingColor ? <p className="side-menu-context-menu__status">Saving color...</p> : null}
+          </div>
+        </div>
+      )}
     </aside>
   )
+}
+
+function isHexColor(value: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(value.trim())
+}
+
+function getValidHexColor(value: string): string {
+  const normalizedValue = value.trim()
+
+  if (isHexColor(normalizedValue)) {
+    return normalizedValue.toLowerCase()
+  }
+
+  return '#64748b'
 }
 
 export default SideMenu

@@ -7,6 +7,7 @@ interface TableViewProps {
   description?: string
   createType?: 'task' | 'goal'
   tasks: TaskWithRelations[]
+  lastCreatedTaskId: number | null
   projects: Project[]
   categories: Category[]
   tags: Tag[]
@@ -26,6 +27,7 @@ function TableView({
   description = 'Table view for all tasks in your current context.',
   createType = 'task',
   tasks,
+  lastCreatedTaskId,
   projects,
   categories,
   tags,
@@ -47,6 +49,7 @@ function TableView({
       </header>
       <TaskTable
         tasks={tasks}
+        lastCreatedTaskId={lastCreatedTaskId}
         projects={projects}
         categories={categories}
         tags={tags}

@@ -25,6 +25,7 @@ const GOAL_GROUP_BY_STORAGE_KEY = 'goal-table-group-by'
 
 interface TaskTableProps {
   tasks: TaskWithRelations[]
+  lastCreatedTaskId: number | null
   projects: Project[]
   categories: Category[]
   tags: Tag[]
@@ -42,6 +43,7 @@ interface TaskTableProps {
 
 function TaskTable({
   tasks,
+  lastCreatedTaskId,
   projects,
   categories,
   tags: _tags,
@@ -61,6 +63,7 @@ function TaskTable({
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortAsc, setSortAsc] = useState(true)
   const [groupBy, setGroupBy] = useState<TableGroupBy>(() => readStoredGroupBy(groupByStorageKey))
+  const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Record<string, boolean>>({})
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [creatingTask, setCreatingTask] = useState(false)
   const [quickDueDate, setQuickDueDate] = useState('')
@@ -68,7 +71,6 @@ function TaskTable({
   const [quickProjectId, setQuickProjectId] = useState('')
   const [goalSubtaskTitles, setGoalSubtaskTitles] = useState<Record<number, string>>({})
   const [creatingGoalSubtaskId, setCreatingGoalSubtaskId] = useState<number | null>(null)
-  const [newlyCreatedTaskId, setNewlyCreatedTaskId] = useState<number | null>(null)
   const [shouldRefocusQuickAdd, setShouldRefocusQuickAdd] = useState(false)
   const quickAddInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -128,20 +130,6 @@ function TaskTable({
   }, [groupBy, groupByStorageKey])
 
   useEffect(() => {
-    if (newlyCreatedTaskId === null) {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setNewlyCreatedTaskId(null)
-    }, 3000)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [newlyCreatedTaskId])
-
-  useEffect(() => {
     if (!shouldRefocusQuickAdd || creatingTask) {
       return
     }
@@ -175,10 +163,6 @@ function TaskTable({
               ? null
               : Number(quickProjectId),
       })
-
-      if (createdTaskId !== null) {
-        setNewlyCreatedTaskId(createdTaskId)
-      }
 
       setNewTaskTitle('')
       setQuickDueDate('')
@@ -460,7 +444,7 @@ function TaskTable({
                   setGoalSubtaskTitles,
                   creatingGoalSubtaskId,
                   handleCreateGoalSubtask,
-                  newlyCreatedTaskId,
+                  lastCreatedTaskId,
                   handleContextMenu,
                   editingCell,
                   editingValue,
@@ -472,14 +456,35 @@ function TaskTable({
                   categories,
                 ),
               )
-            : groupedTaskTree.map((section) => (
+            : groupedTaskTree.map((section) => {
+                const groupKey = `${section.groupBy}:${section.groupLabel}`
+                const isCollapsed = collapsedGroupKeys[groupKey] === true
+
+                return (
                 <Fragment key={`${section.groupBy}-${section.groupLabel}`}>
                   <tr className={getGroupRowClassName(section.groupBy, section.groupLabel)}>
                     <td colSpan={7}>
+                      <button
+                        type="button"
+                        className="group-row-toggle"
+                        aria-expanded={!isCollapsed}
+                        aria-label={isCollapsed ? `Expand ${formatGroupTitle(section.groupTitle)}` : `Collapse ${formatGroupTitle(section.groupTitle)}`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setCollapsedGroupKeys((previous) => ({
+                            ...previous,
+                            [groupKey]: !isCollapsed,
+                          }))
+                        }}
+                      >
+                        <span className="group-row-toggle__triangle" aria-hidden="true">
+                          {isCollapsed ? '▸' : '▾'}
+                        </span>
+                      </button>
                       <strong>{formatGroupTitle(section.groupTitle)}</strong>
                     </td>
                   </tr>
-                  {section.nodes.flatMap((node) =>
+                  {!isCollapsed && section.nodes.flatMap((node) =>
                     renderTaskRow(
                       node,
                       0,
@@ -492,7 +497,7 @@ function TaskTable({
                       setGoalSubtaskTitles,
                       creatingGoalSubtaskId,
                       handleCreateGoalSubtask,
-                      newlyCreatedTaskId,
+                      lastCreatedTaskId,
                       handleContextMenu,
                       editingCell,
                       editingValue,
@@ -505,7 +510,7 @@ function TaskTable({
                     ),
                   )}
                 </Fragment>
-              ))}
+              )})}
         </tbody>
       </table>
 
@@ -592,10 +597,11 @@ function renderTaskRow(
   const goalSubtitle = !isGoalView && task.type !== 'goal' ? goalParentTitle : null
   const canCreateUnderGoal = showGoalCreateField && task.type === 'goal'
   const goalSubtaskTitle = goalSubtaskTitles[task.id] ?? ''
+  const isNewlyCreatedTask = !isGoalView && newlyCreatedTaskId !== null && Number(newlyCreatedTaskId) === Number(task.id)
   const rowClassName = [
     selectedTaskId === task.id ? 'row-selected' : '',
     isSubtask ? 'task-row--subtask' : '',
-    newlyCreatedTaskId === task.id ? 'task-row--new' : '',
+    isNewlyCreatedTask ? 'task-row--new' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -648,7 +654,10 @@ function renderTaskRow(
         ) : (
           <>
             {!(isGoalView && task.type === 'goal' && !isSubtask) && (
-              <span className={getStatusIndicatorClassName(task.status)} title={task.status}>
+              <span
+                className={`${getStatusIndicatorClassName(task.status)}${isNewlyCreatedTask ? ' status-dot--new-task' : ''}`}
+                title={task.status}
+              >
                 {task.status === 'done' ? '✓' : ''}
               </span>
             )}
@@ -947,6 +956,16 @@ function getSortedTasks(tasks: TaskWithRelations[], field: SortField | null, asc
   }
 
   const sorted = [...tasks].sort((a, b) => {
+    if (field === 'end_date') {
+      const aHasDate = Boolean(a.end_date)
+      const bHasDate = Boolean(b.end_date)
+
+      // Keep undated tasks at the end regardless of sort direction.
+      if (aHasDate !== bHasDate) {
+        return aHasDate ? -1 : 1
+      }
+    }
+
     let aVal: string | number = ''
     let bVal: string | number = ''
 
@@ -983,6 +1002,10 @@ function getSortedTasks(tasks: TaskWithRelations[], field: SortField | null, asc
 
     if (typeof aVal === 'string' && typeof bVal === 'string') {
       return ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+    }
+
+    if (aVal === bVal) {
+      return 0
     }
 
     return ascending ? (aVal > bVal ? 1 : -1) : (aVal > bVal ? -1 : 1)

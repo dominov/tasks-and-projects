@@ -10,6 +10,8 @@ import type { TaskCreatePayload, TaskUpdatePayload } from '../common/types'
 function App() {
   const [viewType, setViewType] = useState<ViewType>('tasks')
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
+  const [lastCreatedTaskId, setLastCreatedTaskId] = useState<number | null>(null)
+  const [isSideMenuVisible, setIsSideMenuVisible] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [projectId, setProjectId] = useState<number | null>(null)
   const [tagId, setTagId] = useState<number | null>(null)
@@ -53,6 +55,20 @@ function App() {
       showBanner(error, 'error')
     }
   }, [error, showBanner])
+
+  useEffect(() => {
+    if (lastCreatedTaskId === null) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setLastCreatedTaskId(null)
+    }, 4000)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [lastCreatedTaskId])
 
   function handleSelectTask(taskId: number): void {
     setSelectedTaskId(taskId)
@@ -183,7 +199,7 @@ function App() {
       }
 
       try {
-        await window.taskAppApi.createTask({
+        const createResult = await window.taskAppApi.createTask({
           title: payload.title,
           start_date: payload.start_date ?? null,
           end_date: payload.end_date ?? null,
@@ -192,6 +208,10 @@ function App() {
           category_id: payload.category_id ?? null,
           tag_ids: payload.tag_ids,
         })
+        const createdTaskId = Number(createResult.taskId)
+        if (Number.isInteger(createdTaskId) && createdTaskId > 0) {
+          setLastCreatedTaskId(createdTaskId)
+        }
         await refreshWorkspaceData()
         showBanner('Subtask created.', 'info')
       } catch {
@@ -230,6 +250,10 @@ function App() {
           await window.taskAppApi.updateTask(createdTaskId, { status: options.status })
         }
 
+        if (Number.isInteger(createdTaskId) && createdTaskId > 0) {
+          setLastCreatedTaskId(createdTaskId)
+        }
+
         await refreshWorkspaceData()
         showBanner('Task created.', 'info')
         return Number.isInteger(createdTaskId) && createdTaskId > 0 ? createdTaskId : null
@@ -248,11 +272,15 @@ function App() {
       }
 
       try {
-        await window.taskAppApi.createTask({
+        const createResult = await window.taskAppApi.createTask({
           title: title.trim(),
           type: 'task',
           parent_task_id: goalId,
         })
+        const createdTaskId = Number(createResult.taskId)
+        if (Number.isInteger(createdTaskId) && createdTaskId > 0) {
+          setLastCreatedTaskId(createdTaskId)
+        }
         await refreshWorkspaceData()
         showBanner('Subtask created for goal.', 'info')
       } catch {
@@ -320,9 +348,7 @@ function App() {
         return
       }
 
-      const keepAssociatedTasks = window.confirm(
-        'Keep associated tasks? Click OK to keep tasks, or Cancel to delete associated tasks too.',
-      )
+      const keepAssociatedTasks = await window.taskAppApi.confirmKeepAssociatedTasks()
 
       try {
         await window.taskAppApi.deleteProject(project.id, keepAssociatedTasks)
@@ -348,9 +374,7 @@ function App() {
         return
       }
 
-      const keepAssociatedTasks = window.confirm(
-        'Keep associated tasks? Click OK to keep tasks, or Cancel to delete associated tasks too.',
-      )
+      const keepAssociatedTasks = await window.taskAppApi.confirmKeepAssociatedTasks()
 
       try {
         await window.taskAppApi.deleteTag(tag.id, keepAssociatedTasks)
@@ -376,9 +400,7 @@ function App() {
         return
       }
 
-      const keepAssociatedTasks = window.confirm(
-        'Keep associated tasks? Click OK to keep tasks, or Cancel to delete associated tasks too.',
-      )
+      const keepAssociatedTasks = await window.taskAppApi.confirmKeepAssociatedTasks()
 
       try {
         await window.taskAppApi.deleteCategory(category.id, keepAssociatedTasks)
@@ -394,6 +416,33 @@ function App() {
       }
     },
     [categoryId, refreshWorkspaceData, showBanner],
+  )
+
+  const handleUpdateProject = useCallback(
+    async (projectIdToUpdate: number, payload: { name?: string; color?: string }) => {
+      await window.taskAppApi.updateProject(projectIdToUpdate, payload)
+      await refreshWorkspaceData()
+      showBanner('Project updated.', 'info')
+    },
+    [refreshWorkspaceData, showBanner],
+  )
+
+  const handleUpdateTag = useCallback(
+    async (tagIdToUpdate: number, payload: { name?: string; color?: string }) => {
+      await window.taskAppApi.updateTag(tagIdToUpdate, payload)
+      await refreshWorkspaceData()
+      showBanner('Tag updated.', 'info')
+    },
+    [refreshWorkspaceData, showBanner],
+  )
+
+  const handleUpdateCategory = useCallback(
+    async (categoryIdToUpdate: number, payload: { name?: string; color?: string }) => {
+      await window.taskAppApi.updateCategory(categoryIdToUpdate, payload)
+      await refreshWorkspaceData()
+      showBanner('Category updated.', 'info')
+    },
+    [refreshWorkspaceData, showBanner],
   )
 
   const handleExportData = useCallback(async () => {
@@ -481,31 +530,40 @@ function App() {
 
   return (
     <div className={presentationMode ? 'app-root presentation-mode' : 'app-root'}>
-    <main className={detailsOpen ? 'trip-layout sidebar-open' : 'trip-layout'}>
-      <SideMenu
-        viewType={viewType}
-        projects={projects}
-        tags={tags}
-        categories={categories}
-        showCompletedTasks={showCompletedTasks}
-        selectedProjectId={projectId}
-        selectedTagId={tagId}
-        selectedCategoryId={categoryId}
-        isDataOperationLoading={isDataOperationLoading}
-        onChangeView={setViewType}
-        onToggleCompletedTasks={setShowCompletedTasks}
-        onSelectProject={setProjectId}
-        onSelectTag={setTagId}
-        onSelectCategory={setCategoryId}
-        onOpenProjectCreateView={() => setViewType('create-project')}
-        onOpenTagCreateView={() => setViewType('create-tag')}
-        onOpenCategoryCreateView={() => setViewType('create-category')}
-        onDeleteProject={handleDeleteProject}
-        onDeleteTag={handleDeleteTag}
-        onDeleteCategory={handleDeleteCategory}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
-      />
+    <main className={[
+      'trip-layout',
+      detailsOpen ? 'sidebar-open' : '',
+      isSideMenuVisible ? '' : 'side-menu-hidden',
+    ].filter(Boolean).join(' ')}>
+      {isSideMenuVisible && (
+        <SideMenu
+          viewType={viewType}
+          projects={projects}
+          tags={tags}
+          categories={categories}
+          showCompletedTasks={showCompletedTasks}
+          selectedProjectId={projectId}
+          selectedTagId={tagId}
+          selectedCategoryId={categoryId}
+          isDataOperationLoading={isDataOperationLoading}
+          onChangeView={setViewType}
+          onToggleCompletedTasks={setShowCompletedTasks}
+          onSelectProject={setProjectId}
+          onSelectTag={setTagId}
+          onSelectCategory={setCategoryId}
+          onOpenProjectCreateView={() => setViewType('create-project')}
+          onOpenTagCreateView={() => setViewType('create-tag')}
+          onOpenCategoryCreateView={() => setViewType('create-category')}
+          onDeleteProject={handleDeleteProject}
+          onDeleteTag={handleDeleteTag}
+          onDeleteCategory={handleDeleteCategory}
+          onUpdateProject={handleUpdateProject}
+          onUpdateTag={handleUpdateTag}
+          onUpdateCategory={handleUpdateCategory}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+        />
+      )}
 
       <section className="main-canvas" aria-live="polite">
         {isDataOperationLoading && (
@@ -519,6 +577,13 @@ function App() {
             <p className="eyebrow">View Manager</p>
             <h1>Personal Task Management</h1>
           </div>
+          <button
+            type="button"
+            className="side-menu-toggle"
+            onClick={() => setIsSideMenuVisible((value) => !value)}
+          >
+            {isSideMenuVisible ? 'Hide menu' : 'Show menu'}
+          </button>
         </header>
 
         {loading && <p>Loading workspace data...</p>}
@@ -526,6 +591,7 @@ function App() {
           <ViewManager
             viewType={viewType}
             tasks={displayedTasks}
+            lastCreatedTaskId={lastCreatedTaskId}
             projects={projects}
             categories={categories}
             tags={tags}

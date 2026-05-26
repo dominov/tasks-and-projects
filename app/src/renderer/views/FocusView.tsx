@@ -374,51 +374,53 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
           </div>
         </section>
 
-        {/* BOX 2: Overdue */}
-        {sortedOverdue.length > 0 && (
-          <section className="focus-box focus-box--overdue">
-            <h2 className="focus-box__title focus-box__title--overdue">
-              <AlertIcon />
-              Overdue Tasks
-            </h2>
-            <div className="focus-overdue-list">
-              {sortedOverdue.map((task) => (
-                <FocusCard
+        <div className="focus-secondary-grid">
+          {/* BOX 2: Overdue */}
+          {sortedOverdue.length > 0 && (
+            <section className="focus-box focus-box--overdue">
+              <h2 className="focus-box__title focus-box__title--overdue">
+                <AlertIcon />
+                Overdue Tasks
+              </h2>
+              <div className="focus-overdue-list">
+                {sortedOverdue.map((task) => (
+                  <FocusCard
+                    key={task.id}
+                    task={task}
+                    selected={selectedTaskId === task.id}
+                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                    onSelect={onSelectTask}
+                    overdue
+                    onMoveStatus={handleMoveTaskStatus}
+                    statusUpdating={updatingTaskIds.has(task.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* BOX 3: Next Business Day */}
+          <section className="focus-box focus-box--tomorrow">
+            <h2 className="focus-box__title focus-box__title--tomorrow">Next Business Day</h2>
+            <div className="focus-tomorrow-list">
+              {tomorrowTasks.length === 0 && <EmptyState text="No tasks scheduled" />}
+              {tomorrowTasks.map((task) => (
+                <button
                   key={task.id}
-                  task={task}
-                  selected={selectedTaskId === task.id}
-                  projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
-                  onSelect={onSelectTask}
-                  overdue
-                  onMoveStatus={handleMoveTaskStatus}
-                  statusUpdating={updatingTaskIds.has(task.id)}
-                />
+                  type="button"
+                  data-details-trigger="open"
+                  className={`focus-tomorrow-item${selectedTaskId === task.id ? ' focus-tomorrow-item--active' : ''}`}
+                  onClick={() => onSelectTask(task.id)}
+                >
+                  <span className="focus-tomorrow-item__title">{task.title}</span>
+                  {task.project_name && (
+                    <span className="focus-tomorrow-item__project">{task.project_name}</span>
+                  )}
+                </button>
               ))}
             </div>
           </section>
-        )}
-
-        {/* BOX 3: Next Business Day */}
-        <section className="focus-box focus-box--tomorrow">
-          <h2 className="focus-box__title focus-box__title--tomorrow">Next Business Day</h2>
-          <div className="focus-tomorrow-list">
-            {tomorrowTasks.length === 0 && <EmptyState text="No tasks scheduled" />}
-            {tomorrowTasks.map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                data-details-trigger="open"
-                className={`focus-tomorrow-item${selectedTaskId === task.id ? ' focus-tomorrow-item--active' : ''}`}
-                onClick={() => onSelectTask(task.id)}
-              >
-                <span className="focus-tomorrow-item__title">{task.title}</span>
-                {task.project_name && (
-                  <span className="focus-tomorrow-item__project">{task.project_name}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
+        </div>
       </div>
     </div>
   )
@@ -437,11 +439,24 @@ interface FocusCardProps {
   showPulse?: boolean
 }
 
+function getPriorityTone(priority: number): 'low' | 'medium' | 'high' {
+  if (priority === 3) {
+    return 'high'
+  }
+
+  if (priority === 1) {
+    return 'low'
+  }
+
+  return 'medium'
+}
+
 function FocusCard({ task, selected, projectColor, onSelect, onMoveStatus, statusUpdating, overdue, showPulse }: FocusCardProps) {
   const tags = task.tag_names ? task.tag_names.split(',').map((t) => t.trim()) : []
   const categoryIcon = getCategoryIcon(task.category_name)
   const canMovePrev = task.status !== 'todo'
   const canMoveNext = task.status !== 'done'
+  const priorityTone = getPriorityTone(task.priority)
 
   return (
     <div
@@ -450,8 +465,7 @@ function FocusCard({ task, selected, projectColor, onSelect, onMoveStatus, statu
       data-details-trigger="open"
       className={[
         'focus-card',
-        task.priority === 2 && 'focus-card--priority-medium',
-        task.priority === 3 && 'focus-card--priority-high',
+        `weekly-task--priority-${priorityTone}`,
         selected && 'focus-card--selected',
         overdue && 'focus-card--overdue',
         showPulse && 'focus-card--pulse',
