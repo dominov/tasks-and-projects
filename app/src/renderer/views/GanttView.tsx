@@ -11,6 +11,10 @@ interface GanttViewProps {
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
   onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
+  onShiftTasks: (
+    updates: Array<{ taskId: number; payload: TaskUpdatePayload }>,
+    successMessage: string,
+  ) => Promise<void>
   presentationMode: boolean
   onTogglePresentationMode: () => void
 }
@@ -25,6 +29,7 @@ const MIN_SIDE_PANEL_WIDTH = 180
 const MAX_SIDE_PANEL_WIDTH = 560
 const DAYS_BEFORE_TODAY = 30
 const DAYS_AFTER_TODAY = 60
+const CLICK_SUPPRESSION_MS = 250
 
 interface DayCell {
   date: Date
@@ -69,6 +74,7 @@ function GanttView({
   onSelectTask,
   selectedTaskId,
   onUpdateTask,
+  onShiftTasks,
   presentationMode,
   onTogglePresentationMode,
 }: GanttViewProps) {
@@ -78,6 +84,10 @@ function GanttView({
   const [sidePanelWidth, setSidePanelWidth] = useState(DEFAULT_SIDE_PANEL_WIDTH)
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const suppressedClickRef = useRef<{ taskId: number | null; until: number }>({
+    taskId: null,
+    until: 0,
+  })
 
   // Observe canvas width so the timeline reflows when the right details
   // sidebar pushes the main canvas (Tarea 5: Push Sidebar responsive).
@@ -103,6 +113,14 @@ function GanttView({
     return map
   }, [projects])
 
+  const taskById = useMemo(() => {
+    const map = new Map<number, TaskWithRelations>()
+    for (const task of tasks) {
+      map.set(task.id, task)
+    }
+    return map
+  }, [tasks])
+
   const datedTasks = useMemo(() => tasks.filter((task) => Boolean(task.start_date || task.end_date)), [tasks])
 
   const goalTasks = useMemo(() => datedTasks.filter((task) => task.type === 'goal'), [datedTasks])
@@ -126,6 +144,19 @@ function GanttView({
     }
     return map
   }, [datedTasks])
+
+  const allChildrenByParent = useMemo(() => {
+    const map = new Map<number, TaskWithRelations[]>()
+    for (const task of tasks) {
+      if (!task.parent_task_id) {
+        continue
+      }
+      const list = map.get(task.parent_task_id) ?? []
+      list.push(task)
+      map.set(task.parent_task_id, list)
+    }
+    return map
+  }, [tasks])
 
   const rows = useMemo<GanttRow[]>(() => {
     if (goalTasks.length === 0) {
@@ -254,8 +285,8 @@ function GanttView({
 
   const beginDrag = useCallback(
     (event: React.PointerEvent<HTMLElement>, task: TaskWithRelations, mode: 'move' | 'resize') => {
-      if (task.type === 'goal') {
-        // Goal dates are derived from subtasks; keep them read-only.
+      if (task.type === 'goal' && mode === 'resize') {
+        // Goal resizing is disabled because bounds come from subtasks.
         return
       }
       event.stopPropagation()
@@ -318,7 +349,56 @@ function GanttView({
         return
       }
 
+      // Prevent the synthetic click that can fire after pointer-up on a drag.
+      suppressedClickRef.current = {
+        taskId,
+        until: Date.now() + CLICK_SUPPRESSION_MS,
+      }
+
       if (mode === 'move') {
+        const draggedTask = taskById.get(taskId)
+
+        if (draggedTask?.type === 'goal') {
+          const descendants: TaskWithRelations[] = []
+          const pendingIds: number[] = [taskId]
+
+          while (pendingIds.length > 0) {
+            const parentId = pendingIds.shift()
+            if (parentId === undefined) {
+              continue
+            }
+
+            for (const child of allChildrenByParent.get(parentId) ?? []) {
+              descendants.push(child)
+              pendingIds.push(child.id)
+            }
+          }
+
+          const updates = [...descendants, draggedTask]
+            .filter((task, index, list) => list.findIndex((item) => item.id === task.id) === index)
+            .map((task) => {
+              const payload: TaskUpdatePayload = {}
+
+              if (task.start_date) {
+                payload.start_date = shiftIsoDate(task.start_date, deltaDays)
+              }
+
+              if (task.end_date) {
+                payload.end_date = shiftIsoDate(task.end_date, deltaDays)
+              }
+
+              return { taskId: task.id, payload }
+            })
+            .filter((update) => Object.keys(update.payload).length > 0)
+
+          if (updates.length === 0) {
+            return
+          }
+
+          await onShiftTasks(updates, 'Goal and subtasks rescheduled.')
+          return
+        }
+
         const nextStart = originalStartIso ? shiftIsoDate(originalStartIso, deltaDays) : null
         const nextEnd = originalEndIso ? shiftIsoDate(originalEndIso, deltaDays) : null
         const payload: TaskUpdatePayload = {}
@@ -340,7 +420,7 @@ function GanttView({
       }
       await onUpdateTask(taskId, { end_date: nextEnd }, 'Task duration updated.')
     },
-    [dragState, onUpdateTask, panelResize],
+    [allChildrenByParent, dragState, onShiftTasks, onUpdateTask, panelResize, taskById],
   )
 
   const liveDelta = dragState ? dragState.deltaDays : 0
@@ -407,12 +487,25 @@ function GanttView({
               {positionedTasks.map((entry, rowIndex) => {
                 const { task, row, left, width } = entry
                 const projectColor = task.project_id ? projectColorById.get(task.project_id) ?? '#475569' : '#475569'
+                const durationDays = getTaskDurationDays(task)
                 const isDragging = dragState?.taskId === task.id
                 const adjustedLeft = isDragging && dragState?.mode === 'move' ? left + liveDeltaPx : left
                 const adjustedWidth =
                   isDragging && dragState?.mode === 'resize' ? Math.max(MIN_WEEKDAY_WIDTH, width + liveDeltaPx) : width
                 const isGoal = task.type === 'goal'
                 const isExpanded = expandedRows[task.id] ?? true
+
+                const handleBarClick = (event: React.MouseEvent<HTMLDivElement>) => {
+                  event.stopPropagation()
+
+                  const suppressed = suppressedClickRef.current
+                  if (suppressed.taskId === task.id && Date.now() <= suppressed.until) {
+                    suppressedClickRef.current = { taskId: null, until: 0 }
+                    return
+                  }
+
+                  onSelectTask(task.id)
+                }
 
                 return (
                   <div className={`gantt-row${isGoal ? ' is-goal' : ''}`} key={task.id} style={{ height: ROW_HEIGHT }}>
@@ -470,12 +563,9 @@ function GanttView({
                           zIndex: 100 + rowIndex,
                         }}
                         onPointerDown={(event) => beginDrag(event, task, 'move')}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onSelectTask(task.id)
-                        }}
+                        onClick={handleBarClick}
                       >
-                        <span className="gantt-bar-label">{task.title}</span>
+                        <span className="gantt-bar-label">{durationDays} day{durationDays === 1 ? '' : 's'}</span>
                         {!isGoal ? (
                           <span
                             className="gantt-bar-handle"
@@ -562,6 +652,20 @@ function shiftIsoDate(iso: string, deltaDays: number): string {
   const base = parseIsoDate(iso)
   const shifted = new Date(base.getFullYear(), base.getMonth(), base.getDate() + deltaDays)
   return toIsoDate(shifted)
+}
+
+function getTaskDurationDays(task: TaskWithRelations): number {
+  const startIso = task.start_date ?? task.end_date
+  const endIso = task.end_date ?? task.start_date
+
+  if (!startIso || !endIso) {
+    return 1
+  }
+
+  const start = parseIsoDate(startIso).getTime()
+  const end = parseIsoDate(endIso).getTime()
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1
+  return Math.max(1, days)
 }
 
 export default GanttView

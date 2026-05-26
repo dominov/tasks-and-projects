@@ -1,13 +1,3 @@
-- remove Add task buttoms 
-b: Table cells should allow modification of each task parameter. For example, double-clicking the header should enable the text field. Double-clicking the task's project should display the project list for modification. Clicking the category should display the category list for modification, and so on. The End Date field should display a calendar.
-
-
-- permitir hacer click derecho en la tarea y abrir menu contextual: 
-    - Cambiar status a Done
-    - duplicar tarea
-    - Eliminar tarea
-    -conertir en Sub task : debe mostrar un desplegable de tareas que este en to-do
-         o in proceso . o combertir a tarea si ya es subtarea
 
 
 

@@ -10,6 +10,7 @@ interface SideMenuProps {
   selectedProjectId: number | null
   selectedTagId: number | null
   selectedCategoryId: number | null
+  isDataOperationLoading: boolean
   onChangeView: (view: ViewType) => void
   onToggleCompletedTasks: (showCompleted: boolean) => void
   onSelectProject: (projectId: number | null) => void
@@ -21,6 +22,8 @@ interface SideMenuProps {
   onDeleteProject: (project: Project) => void
   onDeleteTag: (tag: Tag) => void
   onDeleteCategory: (category: Category) => void
+  onExportData: () => void
+  onImportData: () => void
 }
 
 type IconName = 'calendar-days' | 'check-square' | 'target' | 'calendar' | 'chart' | 'focus' | 'plus' | 'trash'
@@ -32,10 +35,6 @@ const viewMenu: Array<{ id: ViewType; label: string; icon: IconName }> = [
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
   { id: 'gantt', label: 'Gantt', icon: 'chart' },
 ]
-
-function getProjectToneClass(projectId: number): string {
-  return `project-dot--tone-${projectId % 6}`
-}
 
 function SidebarIcon({ name }: { name: IconName }) {
   if (name === 'calendar-days') {
@@ -126,6 +125,7 @@ function SideMenu({
   selectedProjectId,
   selectedTagId,
   selectedCategoryId,
+  isDataOperationLoading,
   onChangeView,
   onToggleCompletedTasks,
   onSelectProject,
@@ -137,6 +137,8 @@ function SideMenu({
   onDeleteProject,
   onDeleteTag,
   onDeleteCategory,
+  onExportData,
+  onImportData,
 }: SideMenuProps) {
   return (
     <aside className="side-menu">
@@ -191,7 +193,14 @@ function SideMenu({
               className={selectedProjectId === project.id ? 'chip active' : 'chip'}
               onClick={() => onSelectProject(project.id)}
             >
-              <span className={`dot ${getProjectToneClass(project.id)}`} aria-hidden="true" />
+              <span
+                className="dot"
+                aria-hidden="true"
+                style={{
+                  backgroundColor: project.color,
+                  borderColor: project.color,
+                }}
+              />
               {project.name}
             </button>
             <button type="button" className="chip-delete" onClick={() => onDeleteProject(project)} aria-label="Delete project">
@@ -264,6 +273,40 @@ function SideMenu({
             </button>
           </div>
         ))}
+      </section>
+
+      <section className="menu-section menu-section--data-actions">
+        <div className="menu-section-title-row">
+          <h3>Data</h3>
+        </div>
+        <div className="data-action-buttons">
+          <button
+            type="button"
+            className="data-action-btn"
+            onClick={onExportData}
+            disabled={isDataOperationLoading}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export Data
+          </button>
+          <button
+            type="button"
+            className="data-action-btn"
+            onClick={onImportData}
+            disabled={isDataOperationLoading}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Import Data
+          </button>
+        </div>
       </section>
     </aside>
   )

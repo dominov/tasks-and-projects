@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import type { Project, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
+import type { Category, Project, Tag, TaskStatus, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
 import TableView from '../views/TableView'
 import FocusView from '../views/FocusView'
 import CreateCategoryView from '../views/CreateCategoryView'
@@ -21,23 +21,31 @@ export interface QuickCreateOptions {
   endDate?: string | null
   priority?: 1 | 2 | 3
   projectId?: number | null
+  status?: TaskStatus
 }
 
 interface ViewManagerProps {
   viewType: ViewType
   tasks: TaskWithRelations[]
   projects: Project[]
+  categories: Category[]
+  tags: Tag[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
   projectId: number | null
   categoryId: number | null
   tagId: number | null
-  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<void>
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>
   onCreateGoalSubtask: (goalId: number, title: string) => Promise<void>
   onCreateProject: (name: string, color: string) => Promise<void>
   onCreateTag: (name: string, color: string) => Promise<void>
   onCreateCategory: (name: string) => Promise<void>
   onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
+  onDeleteTask: (taskId: number) => Promise<void>
+  onShiftTasks: (
+    updates: Array<{ taskId: number; payload: TaskUpdatePayload }>,
+    successMessage: string,
+  ) => Promise<void>
   presentationMode: boolean
   onTogglePresentationMode: () => void
 }
@@ -49,6 +57,8 @@ function ViewManager({
   viewType,
   tasks,
   projects,
+  categories,
+  tags,
   onSelectTask,
   selectedTaskId,
   projectId,
@@ -60,6 +70,8 @@ function ViewManager({
   onCreateTag,
   onCreateCategory,
   onUpdateTask,
+  onDeleteTask,
+  onShiftTasks,
   presentationMode,
   onTogglePresentationMode,
 }: ViewManagerProps) {
@@ -68,14 +80,18 @@ function ViewManager({
   if (viewType === 'tasks') {
     return (
       <TableView
-        tasks={tasks.filter((task) => task.type !== 'goal')}
+        tasks={tasks}
         projects={projects}
+        categories={categories}
+        tags={tags}
         onSelectTask={onSelectTask}
         selectedTaskId={selectedTaskId}
         projectId={projectId}
         categoryId={categoryId}
         tagId={tagId}
         onCreateTask={onCreateTask}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={onDeleteTask}
       />
     )
   }
@@ -88,12 +104,16 @@ function ViewManager({
         createType="goal"
         tasks={objectiveTasks}
         projects={projects}
+        categories={categories}
+        tags={tags}
         onSelectTask={onSelectTask}
         selectedTaskId={selectedTaskId}
         projectId={projectId}
         categoryId={categoryId}
         tagId={tagId}
         onCreateTask={onCreateTask}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={onDeleteTask}
         onCreateGoalSubtask={onCreateGoalSubtask}
       />
     )
@@ -101,7 +121,17 @@ function ViewManager({
 
 
   if (viewType === 'focus') {
-    return <FocusView tasks={tasks} projects={projects} onSelectTask={onSelectTask} selectedTaskId={selectedTaskId} />
+    return (
+      <FocusView
+        tasks={tasks}
+        projects={projects}
+        onSelectTask={onSelectTask}
+        selectedTaskId={selectedTaskId}
+        onCreateTask={onCreateTask}
+        projectId={projectId}
+        onUpdateTask={onUpdateTask}
+      />
+    )
   }
 
   if (viewType === 'create-project') {
@@ -121,6 +151,7 @@ function ViewManager({
       {viewType === 'calendar' ? (
         <CalendarView
           tasks={tasks}
+          projects={projects}
           onSelectTask={onSelectTask}
           selectedTaskId={selectedTaskId}
           onCreateTask={onCreateTask}
@@ -133,6 +164,7 @@ function ViewManager({
           onSelectTask={onSelectTask}
           selectedTaskId={selectedTaskId}
           onUpdateTask={onUpdateTask}
+          onShiftTasks={onShiftTasks}
           presentationMode={presentationMode}
           onTogglePresentationMode={onTogglePresentationMode}
         />

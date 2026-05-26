@@ -16,6 +16,7 @@ function App() {
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [showCompletedTasks, setShowCompletedTasks] = useState(false)
   const [presentationMode, setPresentationMode] = useState(false)
+  const [isDataOperationLoading, setIsDataOperationLoading] = useState(false)
   const { banner, showBanner, dismissBanner } = useBanner()
   const detailsSidebarRef = useRef<HTMLElement | null>(null)
 
@@ -81,16 +82,88 @@ function App() {
     [refreshWorkspaceData, showBanner],
   )
 
+  const handleShiftTasks = useCallback(
+    async (
+      updates: Array<{ taskId: number; payload: TaskUpdatePayload }>,
+      successMessage: string,
+    ) => {
+      if (updates.length === 0) {
+        return
+      }
+
+      try {
+        const conflictTitles = new Set<string>()
+
+        for (const update of updates) {
+          const result = await window.taskAppApi.updateTask(update.taskId, update.payload)
+          for (const conflict of result.conflicts ?? []) {
+            conflictTitles.add(`"${conflict.task_title}"`)
+          }
+        }
+
+        await refreshWorkspaceData()
+
+        if (conflictTitles.size > 0) {
+          showBanner(
+            `Conflicto de Cronograma: ${Array.from(conflictTitles).join(', ')} no se desplazaron porque están en progreso o completadas.`,
+            'warning',
+          )
+        } else {
+          showBanner(successMessage, 'info')
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to update task changes.'
+        showBanner(message, 'error')
+      }
+    },
+    [refreshWorkspaceData, showBanner],
+  )
+
   const handleDeleteTask = useCallback(
     async (taskId: number) => {
       try {
-        const confirmed = window.confirm('Delete this task?')
+        const task = workspaceTasks.find((item) => item.id === taskId) ?? null
+        const hasPreviousInChain = task?.previous_recurrent_id !== null
+        const hasNextInChain = workspaceTasks.some((item) => item.previous_recurrent_id === taskId)
+        const isRecurringChainTask = hasPreviousInChain || hasNextInChain
+        let deleteScope: 'single' | 'future' | 'all' = 'single'
+
+        if (isRecurringChainTask) {
+          const rawChoice = window.prompt(
+            'This task is recurring. Choose deletion scope:\n1) Only this task\n2) This and subsequent tasks\n3) All related tasks (previous and subsequent)\n\nEnter 1, 2, or 3:',
+            '1',
+          )
+
+          if (rawChoice === null) {
+            return
+          }
+
+          const choice = rawChoice.trim()
+
+          if (choice === '2') {
+            deleteScope = 'future'
+          } else if (choice === '3') {
+            deleteScope = 'all'
+          } else if (choice !== '1') {
+            window.alert('Invalid option. Please enter 1, 2, or 3.')
+            return
+          }
+        }
+
+        const confirmationMessage =
+          deleteScope === 'single'
+            ? 'Delete this task?'
+            : deleteScope === 'future'
+              ? 'Delete this task and all subsequent recurring tasks?'
+              : 'Delete all related recurring tasks (previous and subsequent)?'
+
+        const confirmed = window.confirm(confirmationMessage)
 
         if (!confirmed) {
           return
         }
 
-        await window.taskAppApi.deleteTask(taskId)
+        await window.taskAppApi.deleteTask(taskId, deleteScope)
         await refreshWorkspaceData()
         setDetailsOpen(false)
         setSelectedTaskId(null)
@@ -99,7 +172,7 @@ function App() {
         showBanner('Unable to delete task.', 'error')
       }
     },
-    [refreshWorkspaceData, showBanner],
+    [workspaceTasks, refreshWorkspaceData, showBanner],
   )
 
   const handleCreateSubtask = useCallback(
@@ -112,8 +185,12 @@ function App() {
       try {
         await window.taskAppApi.createTask({
           title: payload.title,
+          start_date: payload.start_date ?? null,
           end_date: payload.end_date ?? null,
           parent_task_id: selectedTask.id,
+          project_id: payload.project_id ?? null,
+          category_id: payload.category_id ?? null,
+          tag_ids: payload.tag_ids,
         })
         await refreshWorkspaceData()
         showBanner('Subtask created.', 'info')
@@ -125,9 +202,9 @@ function App() {
   )
 
   const handleCreateTask = useCallback(
-    async (title: string, type: 'task' | 'goal' = 'task', options?: QuickCreateOptions) => {
+    async (title: string, type: 'task' | 'goal' = 'task', options?: QuickCreateOptions): Promise<number | null> => {
       if (!title.trim()) {
-        return
+        return null
       }
 
       try {
@@ -141,21 +218,24 @@ function App() {
           category_id: categoryId,
           tag_ids: tagId ? [tagId] : undefined,
         })
+        const createdTaskId = Number(createResult.taskId)
 
         if (options?.priority) {
-          const createdTaskIdRaw = (createResult as { taskId?: unknown; taskid?: unknown }).taskId
-            ?? (createResult as { taskId?: unknown; taskid?: unknown }).taskid
-          const createdTaskId = Number(createdTaskIdRaw)
-
           if (Number.isInteger(createdTaskId) && createdTaskId > 0) {
             await window.taskAppApi.updateTask(createdTaskId, { priority: options.priority })
           }
         }
 
+        if (options?.status && Number.isInteger(createdTaskId) && createdTaskId > 0) {
+          await window.taskAppApi.updateTask(createdTaskId, { status: options.status })
+        }
+
         await refreshWorkspaceData()
         showBanner('Task created.', 'info')
+        return Number.isInteger(createdTaskId) && createdTaskId > 0 ? createdTaskId : null
       } catch {
         showBanner('Unable to create task.', 'error')
+        return null
       }
     },
     [projectId, categoryId, tagId, refreshWorkspaceData, showBanner],
@@ -316,6 +396,44 @@ function App() {
     [categoryId, refreshWorkspaceData, showBanner],
   )
 
+  const handleExportData = useCallback(async () => {
+    setIsDataOperationLoading(true)
+    try {
+      const result = await window.taskAppApi.exportData()
+      if (result.success) {
+        showBanner(`Export successful: ${result.taskCount} tasks backed up.`, 'info')
+      } else if (result.error) {
+        showBanner(`Export failed: ${result.error}`, 'error')
+      }
+    } catch {
+      showBanner('Unable to export data.', 'error')
+    } finally {
+      setIsDataOperationLoading(false)
+    }
+  }, [showBanner])
+
+  const handleImportData = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Importing data will overwrite existing records with matching IDs. Continue?',
+    )
+    if (!confirmed) return
+
+    setIsDataOperationLoading(true)
+    try {
+      const result = await window.taskAppApi.importData()
+      if (result.success) {
+        await refreshWorkspaceData()
+        showBanner(`Import successful: ${result.totalRecords} records imported (${result.taskCount} tasks).`, 'info')
+      } else if (result.error) {
+        showBanner(`Import failed: ${result.error}`, 'error')
+      }
+    } catch {
+      showBanner('Unable to import data.', 'error')
+    } finally {
+      setIsDataOperationLoading(false)
+    }
+  }, [refreshWorkspaceData, showBanner])
+
   const handleClearDetailsView = useCallback(() => {
     setDetailsOpen(false)
     setSelectedTaskId(null)
@@ -373,6 +491,7 @@ function App() {
         selectedProjectId={projectId}
         selectedTagId={tagId}
         selectedCategoryId={categoryId}
+        isDataOperationLoading={isDataOperationLoading}
         onChangeView={setViewType}
         onToggleCompletedTasks={setShowCompletedTasks}
         onSelectProject={setProjectId}
@@ -384,9 +503,17 @@ function App() {
         onDeleteProject={handleDeleteProject}
         onDeleteTag={handleDeleteTag}
         onDeleteCategory={handleDeleteCategory}
+        onExportData={handleExportData}
+        onImportData={handleImportData}
       />
 
       <section className="main-canvas" aria-live="polite">
+        {isDataOperationLoading && (
+          <div className="data-operation-overlay">
+            <div className="data-operation-spinner" />
+            <span>Processing data...</span>
+          </div>
+        )}
         <header className="canvas-head">
           <div>
             <p className="eyebrow">View Manager</p>
@@ -400,6 +527,8 @@ function App() {
             viewType={viewType}
             tasks={displayedTasks}
             projects={projects}
+            categories={categories}
+            tags={tags}
             onSelectTask={handleSelectTask}
             selectedTaskId={selectedTask?.id ?? null}
             projectId={projectId}
@@ -411,6 +540,8 @@ function App() {
             onCreateTag={handleCreateTag}
             onCreateCategory={handleCreateCategory}
             onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onShiftTasks={handleShiftTasks}
             presentationMode={presentationMode}
             onTogglePresentationMode={() => setPresentationMode((value) => !value)}
           />
@@ -428,6 +559,7 @@ function App() {
         onUpdateTask={handleUpdateTask}
         onDeleteTask={handleDeleteTask}
         onCreateSubtask={handleCreateSubtask}
+        onSelectTask={handleSelectTask}
         onClose={handleClearDetailsView}
       />
     </main>

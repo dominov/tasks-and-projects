@@ -65,7 +65,21 @@ export function groupTasks(tasks: TaskNode[], groupBy: GroupBy): TaskGroupSectio
     groups.get(groupLabel)?.nodes.push(node)
   })
 
-  return Array.from(groups.values()).sort((left, right) => left.groupLabel.localeCompare(right.groupLabel))
+  return Array.from(groups.values()).sort((left, right) => {
+    const leftIsFallback = isFallbackGroupLabel(left.groupLabel)
+    const rightIsFallback = isFallbackGroupLabel(right.groupLabel)
+
+    if (leftIsFallback !== rightIsFallback) {
+      return leftIsFallback ? 1 : -1
+    }
+
+    return left.groupLabel.localeCompare(right.groupLabel)
+  })
+}
+
+function isFallbackGroupLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase()
+  return normalized.startsWith('no ') || normalized === 'none' || normalized === '-'
 }
 
 export function getGroupLabel(task: TaskWithRelations, groupBy: GroupBy): string {

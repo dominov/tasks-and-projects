@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { format, isToday, isTomorrow, isThisWeek } from 'date-fns'
-import type { Project, TaskWithRelations } from '../../common/types'
+import type { Project, TaskStatus, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
+import type { QuickCreateOptions } from '../components/ViewManager'
 
 type SortBy = 'priority' | 'project' | 'story_points'
 
@@ -9,7 +10,12 @@ interface FocusViewProps {
   projects: Project[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>
+  onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
+  projectId: number | null
 }
+
+const STATUS_FLOW: TaskStatus[] = ['todo', 'in_progress', 'done']
 
 function getNextBusinessDay(today: Date): string {
   const day = today.getDay()
@@ -67,8 +73,12 @@ function formatFriendlyDate(dateString: string | null): string {
   return format(date, 'd MMM')
 }
 
-function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewProps) {
+function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask, onUpdateTask, projectId }: FocusViewProps) {
   const [sortBy, setSortBy] = useState<SortBy>('priority')
+  const [addingStatus, setAddingStatus] = useState<'todo' | 'in_progress' | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [creatingTask, setCreatingTask] = useState(false)
+  const [updatingTaskIds, setUpdatingTaskIds] = useState<Set<number>>(new Set())
   const today = new Date().toISOString().slice(0, 10)
   const nextBusinessDay = getNextBusinessDay(new Date())
 
@@ -120,6 +130,80 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewP
     return map
   }, [projects])
 
+  async function handleCreateFocusTask(status: 'todo' | 'in_progress'): Promise<void> {
+    if (!newTaskTitle.trim()) {
+      setAddingStatus(null)
+      return
+    }
+
+    setCreatingTask(true)
+
+    try {
+      await onCreateTask(newTaskTitle.trim(), 'task', {
+        startDate: today,
+        endDate: today,
+        projectId,
+        status,
+        priority: 1,
+      })
+      setNewTaskTitle('')
+      setAddingStatus(null)
+    } finally {
+      setCreatingTask(false)
+    }
+  }
+
+  function openAddTask(status: 'todo' | 'in_progress'): void {
+    setAddingStatus(status)
+    setNewTaskTitle('')
+  }
+
+  function getAdjacentStatus(currentStatus: TaskStatus, direction: 'prev' | 'next'): TaskStatus | null {
+    const currentIndex = STATUS_FLOW.indexOf(currentStatus)
+
+    if (currentIndex < 0) {
+      return null
+    }
+
+    const targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1
+
+    if (targetIndex < 0 || targetIndex >= STATUS_FLOW.length) {
+      return null
+    }
+
+    return STATUS_FLOW[targetIndex]
+  }
+
+  function getStatusLabel(status: TaskStatus): string {
+    if (status === 'todo') return 'To-do'
+    if (status === 'in_progress') return 'In Progress'
+    return 'Done'
+  }
+
+  async function handleMoveTaskStatus(task: TaskWithRelations, direction: 'prev' | 'next'): Promise<void> {
+    const targetStatus = getAdjacentStatus(task.status, direction)
+
+    if (!targetStatus || updatingTaskIds.has(task.id)) {
+      return
+    }
+
+    setUpdatingTaskIds((current) => {
+      const next = new Set(current)
+      next.add(task.id)
+      return next
+    })
+
+    try {
+      await onUpdateTask(task.id, { status: targetStatus }, `Task moved to ${getStatusLabel(targetStatus)}.`)
+    } finally {
+      setUpdatingTaskIds((current) => {
+        const next = new Set(current)
+        next.delete(task.id)
+        return next
+      })
+    }
+  }
+
   return (
     <div className="focus-view">
       {/* Header */}
@@ -167,8 +251,43 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewP
                     selected={selectedTaskId === task.id}
                     projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
                     onSelect={onSelectTask}
+                    onMoveStatus={handleMoveTaskStatus}
+                    statusUpdating={updatingTaskIds.has(task.id)}
                   />
                 ))}
+                <div className="focus-add-task-wrap">
+                  {addingStatus === 'todo' ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      className="add-task-input"
+                      value={newTaskTitle}
+                      onChange={(event) => setNewTaskTitle(event.target.value)}
+                      onBlur={() => {
+                        if (!creatingTask) {
+                          setAddingStatus(null)
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void handleCreateFocusTask('todo')
+                        }
+
+                        if (event.key === 'Escape') {
+                          setAddingStatus(null)
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="add-task-btn"
+                      onClick={() => openAddTask('todo')}
+                    >
+                      + Add task
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="focus-kanban__col-count">{todoToday.length}</div>
             </div>
@@ -189,8 +308,43 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewP
                     projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
                     onSelect={onSelectTask}
                     showPulse
+                    onMoveStatus={handleMoveTaskStatus}
+                    statusUpdating={updatingTaskIds.has(task.id)}
                   />
                 ))}
+                <div className="focus-add-task-wrap">
+                  {addingStatus === 'in_progress' ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      className="add-task-input"
+                      value={newTaskTitle}
+                      onChange={(event) => setNewTaskTitle(event.target.value)}
+                      onBlur={() => {
+                        if (!creatingTask) {
+                          setAddingStatus(null)
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void handleCreateFocusTask('in_progress')
+                        }
+
+                        if (event.key === 'Escape') {
+                          setAddingStatus(null)
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="add-task-btn"
+                      onClick={() => openAddTask('in_progress')}
+                    >
+                      + Add task
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="focus-kanban__col-count">{inProgressToday.length}</div>
             </div>
@@ -210,6 +364,8 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewP
                     selected={selectedTaskId === task.id}
                     projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
                     onSelect={onSelectTask}
+                    onMoveStatus={handleMoveTaskStatus}
+                    statusUpdating={updatingTaskIds.has(task.id)}
                   />
                 ))}
               </div>
@@ -234,6 +390,8 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId }: FocusViewP
                   projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
                   onSelect={onSelectTask}
                   overdue
+                  onMoveStatus={handleMoveTaskStatus}
+                  statusUpdating={updatingTaskIds.has(task.id)}
                 />
               ))}
             </div>
@@ -273,26 +431,71 @@ interface FocusCardProps {
   selected: boolean
   projectColor?: string
   onSelect: (taskId: number) => void
+  onMoveStatus: (task: TaskWithRelations, direction: 'prev' | 'next') => Promise<void>
+  statusUpdating: boolean
   overdue?: boolean
   showPulse?: boolean
 }
 
-function FocusCard({ task, selected, projectColor, onSelect, overdue, showPulse }: FocusCardProps) {
+function FocusCard({ task, selected, projectColor, onSelect, onMoveStatus, statusUpdating, overdue, showPulse }: FocusCardProps) {
   const tags = task.tag_names ? task.tag_names.split(',').map((t) => t.trim()) : []
   const categoryIcon = getCategoryIcon(task.category_name)
+  const canMovePrev = task.status !== 'todo'
+  const canMoveNext = task.status !== 'done'
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       data-details-trigger="open"
       className={[
         'focus-card',
+        task.priority === 2 && 'focus-card--priority-medium',
+        task.priority === 3 && 'focus-card--priority-high',
         selected && 'focus-card--selected',
         overdue && 'focus-card--overdue',
         showPulse && 'focus-card--pulse',
+        statusUpdating && 'focus-card--status-updating',
       ].filter(Boolean).join(' ')}
       onClick={() => onSelect(task.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect(task.id)
+        }
+      }}
+      aria-busy={statusUpdating}
     >
+      {canMovePrev && (
+        <button
+          type="button"
+          className="focus-card__status-btn focus-card__status-btn--left"
+          aria-label="Move task to previous status"
+          onClick={(event) => {
+            event.stopPropagation()
+            void onMoveStatus(task, 'prev')
+          }}
+          disabled={statusUpdating}
+        >
+          <StatusArrowLeftIcon />
+        </button>
+      )}
+
+      {canMoveNext && (
+        <button
+          type="button"
+          className="focus-card__status-btn focus-card__status-btn--right"
+          aria-label="Move task to next status"
+          onClick={(event) => {
+            event.stopPropagation()
+            void onMoveStatus(task, 'next')
+          }}
+          disabled={statusUpdating}
+        >
+          <StatusArrowRightIcon />
+        </button>
+      )}
+
       {/* Top row: title + SP */}
       <div className="focus-card__top">
         <div className="focus-card__title-wrap">
@@ -326,7 +529,7 @@ function FocusCard({ task, selected, projectColor, onSelect, overdue, showPulse 
           <span key={tag} className="focus-card__tag">#{tag}</span>
         ))}
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -353,6 +556,22 @@ function ProgressIcon() {
     <svg className="focus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 6v6l4 2" />
+    </svg>
+  )
+}
+
+function StatusArrowLeftIcon() {
+  return (
+    <svg className="focus-icon focus-icon--small" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+
+function StatusArrowRightIcon() {
+  return (
+    <svg className="focus-icon focus-icon--small" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6" />
     </svg>
   )
 }

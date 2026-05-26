@@ -1,5 +1,18 @@
-import { Fragment, useEffect, useState, type Dispatch, type KeyboardEvent, type ReactNode, type SetStateAction } from 'react'
-import type { Project, TaskWithRelations } from '../../common/types'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type SetStateAction,
+} from 'react'
+import type { Category, Project, Tag, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
 import type { QuickCreateOptions } from './ViewManager'
 import { buildTaskTree, groupTasks, type GroupBy, type TaskNode } from '../utils/taskGrouping'
 import { format, isToday, isTomorrow, isThisWeek } from 'date-fns';
@@ -13,22 +26,34 @@ const GOAL_GROUP_BY_STORAGE_KEY = 'goal-table-group-by'
 interface TaskTableProps {
   tasks: TaskWithRelations[]
   projects: Project[]
+  categories: Category[]
+  tags: Tag[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
   projectId: number | null
+  categoryId: number | null
+  tagId: number | null
   createType: 'task' | 'goal'
-  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<void>
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>
+  onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
+  onDeleteTask: (taskId: number) => Promise<void>
   onCreateGoalSubtask?: (goalId: number, title: string) => Promise<void>
 }
 
 function TaskTable({
   tasks,
   projects,
+  categories,
+  tags: _tags,
   onSelectTask,
   selectedTaskId,
   projectId,
+  categoryId: _categoryId,
+  tagId: _tagId,
   createType,
   onCreateTask,
+  onUpdateTask,
+  onDeleteTask,
   onCreateGoalSubtask,
 }: TaskTableProps) {
   const isGoalView = createType === 'goal'
@@ -43,6 +68,18 @@ function TaskTable({
   const [quickProjectId, setQuickProjectId] = useState('')
   const [goalSubtaskTitles, setGoalSubtaskTitles] = useState<Record<number, string>>({})
   const [creatingGoalSubtaskId, setCreatingGoalSubtaskId] = useState<number | null>(null)
+  const [newlyCreatedTaskId, setNewlyCreatedTaskId] = useState<number | null>(null)
+  const [shouldRefocusQuickAdd, setShouldRefocusQuickAdd] = useState(false)
+  const quickAddInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; task: TaskWithRelations } | null>(null)
+  const [convertSubmenuOpen, setConvertSubmenuOpen] = useState(false)
+  const contextMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ taskId: number; field: string } | null>(null)
+  const [editingValue, setEditingValue] = useState('')
 
   function handleSortClick(field: SortField): void {
     if (sortField === field) {
@@ -53,9 +90,30 @@ function TaskTable({
     }
   }
 
-  const sortedTasks = getSortedTasks(tasks, sortField, sortAsc)
+  const visibleTasks = isGoalView ? tasks : tasks.filter((task) => task.type !== 'goal')
+  const sortedTasks = getSortedTasks(visibleTasks, sortField, sortAsc)
   const taskTree = buildTaskTree(sortedTasks)
   const groupedTaskTree = groupBy === 'none' ? [] : groupTasks(taskTree, groupBy)
+  const taskById = useMemo(() => {
+    const byId = new Map<number, TaskWithRelations>()
+    tasks.forEach((task) => {
+      byId.set(task.id, task)
+    })
+    return byId
+  }, [tasks])
+
+  const goalTitleByTaskId = useMemo(() => {
+    const byTaskId = new Map<number, string>()
+
+    visibleTasks.forEach((task) => {
+      const goalTitle = findGoalAncestorTitle(task, taskById)
+      if (goalTitle) {
+        byTaskId.set(task.id, goalTitle)
+      }
+    })
+
+    return byTaskId
+  }, [visibleTasks, taskById])
 
   const groupOptions: Array<{ value: TableGroupBy; label: string }> = [
     { value: 'none', label: 'None' },
@@ -69,15 +127,45 @@ function TaskTable({
     storeGroupBy(groupByStorageKey, groupBy)
   }, [groupBy, groupByStorageKey])
 
+  useEffect(() => {
+    if (newlyCreatedTaskId === null) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setNewlyCreatedTaskId(null)
+    }, 3000)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [newlyCreatedTaskId])
+
+  useEffect(() => {
+    if (!shouldRefocusQuickAdd || creatingTask) {
+      return
+    }
+
+    const focusId = window.requestAnimationFrame(() => {
+      quickAddInputRef.current?.focus()
+    })
+
+    setShouldRefocusQuickAdd(false)
+
+    return () => {
+      window.cancelAnimationFrame(focusId)
+    }
+  }, [shouldRefocusQuickAdd, creatingTask])
+
   async function handleCreateNewTask(): Promise<void> {
-    if (!newTaskTitle.trim()) {
+    if (creatingTask || !newTaskTitle.trim()) {
       return
     }
 
     setCreatingTask(true)
 
     try {
-      await onCreateTask(newTaskTitle.trim(), createType, {
+      const createdTaskId = await onCreateTask(newTaskTitle.trim(), createType, {
         endDate: isGoalView ? undefined : quickDueDate || null,
         priority: isGoalView ? undefined : quickPriority ? (Number(quickPriority) as 1 | 2 | 3) : undefined,
         projectId:
@@ -88,12 +176,17 @@ function TaskTable({
               : Number(quickProjectId),
       })
 
+      if (createdTaskId !== null) {
+        setNewlyCreatedTaskId(createdTaskId)
+      }
+
       setNewTaskTitle('')
       setQuickDueDate('')
       setQuickPriority('')
       setQuickProjectId('')
     } finally {
       setCreatingTask(false)
+      setShouldRefocusQuickAdd(true)
     }
   }
 
@@ -124,17 +217,150 @@ function TaskTable({
     }
   }
 
+  function openDatePickerFromEvent(event: MouseEvent<HTMLInputElement> | FocusEvent<HTMLInputElement>): void {
+    const input = event.currentTarget
+    if (input.disabled || input.readOnly) {
+      return
+    }
+
+    if ('showPicker' in input && typeof input.showPicker === 'function') {
+      input.showPicker()
+    }
+  }
+
+  // ─── Context Menu ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!contextMenu) return
+
+    function handleClickOutside(event: globalThis.MouseEvent): void {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+        setContextMenu(null)
+        setConvertSubmenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [contextMenu])
+
+  function handleContextMenu(event: globalThis.MouseEvent, task: TaskWithRelations): void {
+    event.preventDefault()
+    setContextMenu({ x: event.clientX, y: event.clientY, task })
+    setConvertSubmenuOpen(false)
+  }
+
+  const handleContextStatusChange = useCallback(
+    (status: 'in_progress' | 'done') => {
+      if (!contextMenu) return
+      const label = status === 'in_progress' ? 'In Progress' : 'Done'
+      void onUpdateTask(contextMenu.task.id, { status }, `Status changed to ${label}.`)
+      setContextMenu(null)
+    },
+    [contextMenu, onUpdateTask],
+  )
+
+  const handleContextDuplicate = useCallback(async () => {
+    if (!contextMenu) return
+    const task = contextMenu.task
+    setContextMenu(null)
+    await onCreateTask(task.title, task.type, {
+      startDate: task.start_date,
+      endDate: task.end_date,
+      priority: task.priority as 1 | 2 | 3,
+      projectId: task.project_id,
+      status: task.status,
+    })
+  }, [contextMenu, onCreateTask])
+
+  const handleContextDelete = useCallback(async () => {
+    if (!contextMenu) return
+    const taskId = contextMenu.task.id
+    setContextMenu(null)
+    await onDeleteTask(taskId)
+  }, [contextMenu, onDeleteTask])
+
+  const handleContextConvertToSubtask = useCallback(
+    (parentId: number) => {
+      if (!contextMenu) return
+      void onUpdateTask(contextMenu.task.id, { parent_task_id: parentId }, 'Converted to subtask.')
+      setContextMenu(null)
+      setConvertSubmenuOpen(false)
+    },
+    [contextMenu, onUpdateTask],
+  )
+
+  const handleContextConvertToTask = useCallback(() => {
+    if (!contextMenu) return
+    void onUpdateTask(contextMenu.task.id, { parent_task_id: null }, 'Converted to independent task.')
+    setContextMenu(null)
+  }, [contextMenu, onUpdateTask])
+
+  // ─── Inline editing ───────────────────────────────────────────
+  function startEditing(taskId: number, field: string, currentValue: string): void {
+    setEditingCell({ taskId, field })
+    setEditingValue(currentValue)
+  }
+
+  function cancelEditing(): void {
+    setEditingCell(null)
+    setEditingValue('')
+  }
+
+  function commitEditing(overrideValue?: string): void {
+    if (!editingCell) return
+    const { taskId, field } = editingCell
+    const task = taskById.get(taskId)
+    if (!task) { cancelEditing(); return }
+
+    const value = overrideValue !== undefined ? overrideValue : editingValue
+
+    if (field === 'title') {
+      const trimmed = value.trim()
+      if (trimmed && trimmed !== task.title) {
+        void onUpdateTask(taskId, { title: trimmed }, 'Title updated.')
+      }
+    } else if (field === 'end_date') {
+      const nextDate = value || null
+      if (nextDate !== (task.end_date ?? null)) {
+        void onUpdateTask(taskId, { end_date: nextDate }, 'Due date updated.')
+      }
+    } else if (field === 'priority') {
+      const nextPriority = Number(value) as 1 | 2 | 3
+      if (nextPriority !== task.priority) {
+        void onUpdateTask(taskId, { priority: nextPriority }, 'Priority updated.')
+      }
+    } else if (field === 'project') {
+      const nextProjectId = value === '' ? null : Number(value)
+      if (nextProjectId !== task.project_id) {
+        void onUpdateTask(taskId, { project_id: nextProjectId }, 'Project updated.')
+      }
+    } else if (field === 'category') {
+      const nextCategoryId = value === '' ? null : Number(value)
+      if (nextCategoryId !== task.category_id) {
+        void onUpdateTask(taskId, { category_id: nextCategoryId }, 'Category updated.')
+      }
+    } else if (field === 'story_points') {
+      const nextSP = Math.max(0, Number(value) || 0)
+      if (nextSP !== task.story_points) {
+        void onUpdateTask(taskId, { story_points: nextSP }, 'Story points updated.')
+      }
+    }
+    cancelEditing()
+  }
+
   return (
     <div className="table-wrap">
       <div className={`quick-add-toolbar ${isGoalView ? 'quick-add-toolbar--goal' : ''}`}>
         <input
+          ref={quickAddInputRef}
           type="text"
           className="quick-add-input"
           placeholder={createType === 'goal' ? 'Title (new goal)...' : 'Title (new task)...'}
           value={newTaskTitle}
           onChange={(event) => setNewTaskTitle(event.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={creatingTask}
+          readOnly={creatingTask}
+          aria-busy={creatingTask}
         />
         {!isGoalView && (
           <>
@@ -143,6 +369,8 @@ function TaskTable({
               className="quick-add-date"
               placeholder="Due date"
               value={quickDueDate}
+              onClick={openDatePickerFromEvent}
+              onFocus={openDatePickerFromEvent}
               onChange={(event) => setQuickDueDate(event.target.value)}
               disabled={creatingTask}
             />
@@ -223,6 +451,7 @@ function TaskTable({
                 renderTaskRow(
                   node,
                   0,
+                  goalTitleByTaskId.get(node.task.id) ?? null,
                   selectedTaskId,
                   onSelectTask,
                   isGoalView,
@@ -231,6 +460,16 @@ function TaskTable({
                   setGoalSubtaskTitles,
                   creatingGoalSubtaskId,
                   handleCreateGoalSubtask,
+                  newlyCreatedTaskId,
+                  handleContextMenu,
+                  editingCell,
+                  editingValue,
+                  setEditingValue,
+                  startEditing,
+                  commitEditing,
+                  cancelEditing,
+                  projects,
+                  categories,
                 ),
               )
             : groupedTaskTree.map((section) => (
@@ -244,6 +483,7 @@ function TaskTable({
                     renderTaskRow(
                       node,
                       0,
+                      goalTitleByTaskId.get(node.task.id) ?? null,
                       selectedTaskId,
                       onSelectTask,
                       isGoalView,
@@ -252,12 +492,73 @@ function TaskTable({
                       setGoalSubtaskTitles,
                       creatingGoalSubtaskId,
                       handleCreateGoalSubtask,
+                      newlyCreatedTaskId,
+                      handleContextMenu,
+                      editingCell,
+                      editingValue,
+                      setEditingValue,
+                      startEditing,
+                      commitEditing,
+                      cancelEditing,
+                      projects,
+                      categories,
                     ),
                   )}
                 </Fragment>
               ))}
         </tbody>
       </table>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="task-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          {contextMenu.task.status !== 'in_progress' && (
+            <button type="button" onClick={() => handleContextStatusChange('in_progress')}>
+              Mark In Progress
+            </button>
+          )}
+          {contextMenu.task.status !== 'done' && (
+            <button type="button" onClick={() => handleContextStatusChange('done')}>
+              Mark Done
+            </button>
+          )}
+          <button type="button" onClick={() => void handleContextDuplicate()}>
+            Duplicate
+          </button>
+          <button type="button" className="task-context-menu__danger" onClick={() => void handleContextDelete()}>
+            Delete
+          </button>
+          {contextMenu.task.parent_task_id !== null ? (
+            <button type="button" onClick={handleContextConvertToTask}>
+              Convert to Task
+            </button>
+          ) : (
+            (contextMenu.task.status === 'todo' || contextMenu.task.status === 'in_progress') && (
+              <div className="task-context-menu__submenu-wrap">
+                <button type="button" onClick={() => setConvertSubmenuOpen((v) => !v)}>
+                  Convert to Subtask ▸
+                </button>
+                {convertSubmenuOpen && (
+                  <div className="task-context-menu__submenu">
+                    {visibleTasks
+                      .filter((t) => t.id !== contextMenu.task.id && t.parent_task_id === null)
+                      .slice(0, 20)
+                      .map((t) => (
+                        <button key={t.id} type="button" onClick={() => handleContextConvertToSubtask(t.id)}>
+                          {t.title}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -265,6 +566,7 @@ function TaskTable({
 function renderTaskRow(
   node: TaskNode,
   depth: number,
+  goalParentTitle: string | null,
   selectedTaskId: number | null,
   onSelectTask: (taskId: number) => void,
   isGoalView: boolean,
@@ -273,11 +575,30 @@ function renderTaskRow(
   setGoalSubtaskTitles: Dispatch<SetStateAction<Record<number, string>>>,
   creatingGoalSubtaskId: number | null,
   onCreateGoalSubtask: (goalId: number) => Promise<void>,
+  newlyCreatedTaskId: number | null,
+  onContextMenu: (event: globalThis.MouseEvent, task: TaskWithRelations) => void,
+  editingCell: { taskId: number; field: string } | null,
+  editingValue: string,
+  setEditingValue: Dispatch<SetStateAction<string>>,
+  startEditing: (taskId: number, field: string, currentValue: string) => void,
+  commitEditing: (overrideValue?: string) => void,
+  cancelEditing: () => void,
+  projects: Project[],
+  categories: Category[],
 ): ReactNode[] {
   const { task, children } = node;
   const isSubtask = depth > 0;
+  const nextGoalParentTitle = task.type === 'goal' ? task.title : goalParentTitle
+  const goalSubtitle = !isGoalView && task.type !== 'goal' ? goalParentTitle : null
   const canCreateUnderGoal = showGoalCreateField && task.type === 'goal'
   const goalSubtaskTitle = goalSubtaskTitles[task.id] ?? ''
+  const rowClassName = [
+    selectedTaskId === task.id ? 'row-selected' : '',
+    isSubtask ? 'task-row--subtask' : '',
+    newlyCreatedTaskId === task.id ? 'task-row--new' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
   // Calculate progress for GOALs (only for parent, not subtasks)
   let goalProgress: null | { percent: number; completed: number; total: number } = null
   if (task.type === 'goal' && !isSubtask && children.length > 0) {
@@ -287,62 +608,204 @@ function renderTaskRow(
     goalProgress = { percent, completed, total }
   }
 
-  // isGoalView is now passed as an argument
+  const isEditing = (field: string) => editingCell?.taskId === task.id && editingCell?.field === field
+
+  function handleEditKeyDown(event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>): void {
+    if (event.key === 'Enter') {
+      commitEditing()
+    } else if (event.key === 'Escape') {
+      cancelEditing()
+    }
+  }
 
   const mainRow = (
     <tr
       key={task.id}
       data-details-trigger="open"
-      className={
-        selectedTaskId === task.id
-          ? `row-selected ${isSubtask ? 'task-row--subtask' : ''}`
-          : isSubtask
-            ? 'task-row--subtask'
-            : undefined
-      }
+      className={rowClassName || undefined}
       onClick={() => onSelectTask(task.id)}
+      onContextMenu={(e) => onContextMenu(e.nativeEvent, task)}
     >
-      <td className={isSubtask ? 'task-title-cell task-title-cell--subtask' : 'task-title-cell'}>
-        {/* Status icon to the left of the title (hidden for GOAL parent rows in GOAL view) */}
-        {!(isGoalView && task.type === 'goal' && !isSubtask) && (
-          <span className={getStatusIndicatorClassName(task.status)} title={task.status}>
-            {task.status === 'done' ? '✓' : ''}
-          </span>
-        )}
-        {/* Recurring or Goal icon to the left of the title */}
-        {task.type === 'goal' && (
-          <span className="goal-icon" title="Goal" style={{ marginRight: '0.3rem', fontSize: '1.1em' }}>🎯</span>
-        )}
-        {task.recurrence !== 'none' && (
-          <span className="recurrence-icon" title={`Recurring: ${task.recurrence}`} style={{ marginRight: '0.3rem', fontSize: '1.1em' }}>
-            🔄
-          </span>
-        )}
-        {isSubtask && <span className="task-subtask-marker" aria-hidden="true">↳</span>}
-        {/* GOAL title as headline in GOAL view */}
-        {isGoalView && task.type === 'goal' && !isSubtask ? (
-          <span className="goal-title-headline">{task.title}</span>
+      {/* Title cell */}
+      <td
+        className={isSubtask ? 'task-title-cell task-title-cell--subtask' : 'task-title-cell'}
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          startEditing(task.id, 'title', task.title)
+        }}
+      >
+        {isEditing('title') ? (
+          <input
+            type="text"
+            className="inline-edit-input"
+            value={editingValue}
+            autoFocus
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => commitEditing()}
+            onKeyDown={handleEditKeyDown}
+            onClick={(e) => e.stopPropagation()}
+          />
         ) : (
-          <span className="task-title-text">{task.title}</span>
+          <>
+            {!(isGoalView && task.type === 'goal' && !isSubtask) && (
+              <span className={getStatusIndicatorClassName(task.status)} title={task.status}>
+                {task.status === 'done' ? '✓' : ''}
+              </span>
+            )}
+            {task.type === 'goal' && (
+              <span className="goal-icon" title="Goal" style={{ marginRight: '0.3rem', fontSize: '1.1em' }}>🎯</span>
+            )}
+            {task.recurrence !== 'none' && (
+              <span className="recurrence-icon" title={`Recurring: ${task.recurrence}`} style={{ marginRight: '0.3rem', fontSize: '1.1em' }}>
+                🔄
+              </span>
+            )}
+            {isSubtask && <span className="task-subtask-marker" aria-hidden="true">↳</span>}
+            <div className="task-title-block">
+              {goalSubtitle && <span className="task-title-subtitle">{goalSubtitle}</span>}
+              {isGoalView && task.type === 'goal' && !isSubtask ? (
+                <span className="goal-title-headline">{task.title}</span>
+              ) : (
+                <span className="task-title-text">{task.title}</span>
+              )}
+            </div>
+            {isGoalView && goalProgress && (
+              <span className="goal-progress">{` (${goalProgress.percent}% - ${goalProgress.completed}/${goalProgress.total})`}</span>
+            )}
+          </>
         )}
-        {/* Progress for GOALs in GOAL view */}
-        {isGoalView && goalProgress && (
-          <span className="goal-progress">{` (${goalProgress.percent}% - ${goalProgress.completed}/${goalProgress.total})`}</span>
+      </td>
+
+      {/* End Date cell */}
+      <td
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          if (!(isGoalView && task.type === 'goal')) {
+            startEditing(task.id, 'end_date', task.end_date ?? '')
+          }
+        }}
+      >
+        {isEditing('end_date') ? (
+          <input
+            type="date"
+            className="inline-edit-input"
+            value={editingValue}
+            autoFocus
+            onChange={(e) => { setEditingValue(e.target.value); }}
+            onBlur={() => commitEditing()}
+            onKeyDown={handleEditKeyDown}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          isGoalView && task.type === 'goal' ? '-' : formatDate(task.end_date)
         )}
       </td>
-      <td>{isGoalView && task.type === 'goal' ? '-' : formatDate(task.end_date)}</td>
-      <td>
-        <span className={getPriorityClassName(task.priority)}>
-          {task.priority === 1 ? 'Low' : task.priority === 2 ? 'Medium' : 'High'}
-        </span>
+
+      {/* Priority cell */}
+      <td
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          startEditing(task.id, 'priority', String(task.priority))
+        }}
+      >
+        {isEditing('priority') ? (
+          <select
+            className="inline-edit-select"
+            value={editingValue}
+            autoFocus
+            onChange={(e) => commitEditing(e.target.value)}
+            onBlur={cancelEditing}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="1">Low</option>
+            <option value="2">Medium</option>
+            <option value="3">High</option>
+          </select>
+        ) : (
+          <span className={getPriorityClassName(task.priority)}>
+            {task.priority === 1 ? 'Low' : task.priority === 2 ? 'Medium' : 'High'}
+          </span>
+        )}
       </td>
-      <td>
-        <span className={getProjectBadgeClassName(task.project_id)}>{task.project_name ?? '-'}</span>
+
+      {/* Project cell */}
+      <td
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          startEditing(task.id, 'project', String(task.project_id ?? ''))
+        }}
+      >
+        {isEditing('project') ? (
+          <select
+            className="inline-edit-select"
+            value={editingValue}
+            autoFocus
+            onChange={(e) => commitEditing(e.target.value)}
+            onBlur={cancelEditing}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="">No project</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        ) : (
+          <span className={getProjectBadgeClassName(task.project_id)}>{task.project_name ?? '-'}</span>
+        )}
       </td>
-      <td>{task.category_name ?? '-'}</td>
-      <td>{task.story_points}</td>
+
+      {/* Category cell */}
+      <td
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          startEditing(task.id, 'category', String(task.category_id ?? ''))
+        }}
+      >
+        {isEditing('category') ? (
+          <select
+            className="inline-edit-select"
+            value={editingValue}
+            autoFocus
+            onChange={(e) => commitEditing(e.target.value)}
+            onBlur={cancelEditing}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="">No category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        ) : (
+          task.category_name ?? '-'
+        )}
+      </td>
+
+      {/* Story Points cell */}
+      <td
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          startEditing(task.id, 'story_points', String(task.story_points))
+        }}
+      >
+        {isEditing('story_points') ? (
+          <input
+            type="number"
+            className="inline-edit-input inline-edit-input--sm"
+            min={0}
+            value={editingValue}
+            autoFocus
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => commitEditing()}
+            onKeyDown={handleEditKeyDown}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          task.story_points
+        )}
+      </td>
+
+      {/* Tags cell */}
       <td>
-        {/* Render tags as plain text, comma separated, no circles */}
         {task.tag_names
           ? task.tag_names
               .split(',')
@@ -364,14 +827,25 @@ function renderTaskRow(
     renderTaskRow(
       child,
       depth + 1,
+      nextGoalParentTitle,
       selectedTaskId,
       onSelectTask,
-        isGoalView,
+      isGoalView,
       showGoalCreateField,
       goalSubtaskTitles,
       setGoalSubtaskTitles,
       creatingGoalSubtaskId,
       onCreateGoalSubtask,
+      newlyCreatedTaskId,
+      onContextMenu,
+      editingCell,
+      editingValue,
+      setEditingValue,
+      startEditing,
+      commitEditing,
+      cancelEditing,
+      projects,
+      categories,
     ),
   )
 
@@ -527,6 +1001,28 @@ function formatDate(dateString: string | null): string {
   if (isThisWeek(date)) return format(date, 'EEEE');
 
   return format(date, 'd MMM');
+}
+
+function findGoalAncestorTitle(task: TaskWithRelations, taskById: Map<number, TaskWithRelations>): string | null {
+  const visited = new Set<number>()
+  let parentId = task.parent_task_id
+
+  while (parentId !== null && !visited.has(parentId)) {
+    visited.add(parentId)
+    const parentTask = taskById.get(parentId)
+
+    if (!parentTask) {
+      return null
+    }
+
+    if (parentTask.type === 'goal') {
+      return parentTask.title
+    }
+
+    parentId = parentTask.parent_task_id
+  }
+
+  return null
 }
 
 function readStoredGroupBy(storageKey: string): TableGroupBy {

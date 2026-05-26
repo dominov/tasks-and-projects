@@ -24,7 +24,8 @@ const taskAppApi = {
   listTasks: (): Promise<TaskWithRelations[]> => ipcRenderer.invoke('tasks:list'),
   updateTask: (taskId: number, payload: TaskUpdatePayload): Promise<TaskUpdateResult> =>
     ipcRenderer.invoke('tasks:update', taskId, payload),
-  deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
+  deleteTask: (taskId: number, scope: 'single' | 'future' | 'all' = 'single'): Promise<void> =>
+    ipcRenderer.invoke('tasks:delete', taskId, scope),
   createTask: (payload: TaskCreatePayload): Promise<TaskCreateResult> => ipcRenderer.invoke('tasks:create', payload),
   listProjects: (): Promise<Project[]> => ipcRenderer.invoke('projects:list'),
   createProject: (payload: ProjectCreatePayload): Promise<ProjectCreateResult> =>
@@ -48,6 +49,10 @@ const taskAppApi = {
   listFreeDays: (): Promise<CustomFreeDay[]> => ipcRenderer.invoke('freeDays:list'),
   addFreeDay: (payload: CustomFreeDayPayload): Promise<void> => ipcRenderer.invoke('freeDays:add', payload),
   removeFreeDay: (date: string): Promise<void> => ipcRenderer.invoke('freeDays:remove', date),
+  exportData: (): Promise<{ success: boolean; taskCount?: number; error?: string }> =>
+    ipcRenderer.invoke('data:export'),
+  importData: (): Promise<{ success: boolean; taskCount?: number; totalRecords?: number; error?: string }> =>
+    ipcRenderer.invoke('data:import'),
 }
 
 contextBridge.exposeInMainWorld('taskAppApi', taskAppApi)

@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { DATABASE_FILE_NAME, DEFAULT_DEV_SERVER_URL } from '../common/constants'
 import {
   addBusinessDays,
@@ -33,6 +33,8 @@ import type {
   TaskWithRelations,
 } from '../common/types'
 import { applyMigrations, openDatabase, type AppDatabase } from '../database/db'
+import { exportDataToZip } from './services/exportService'
+import { importDataFromZip } from './services/importService'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -42,6 +44,8 @@ let db: AppDatabase | null = null
 
 const allowedStatuses: TaskStatus[] = ['todo', 'in_progress', 'done']
 const allowedTaskTypes: TaskType[] = ['task', 'goal']
+const allowedDeleteScopes = ['single', 'future', 'all'] as const
+type DeleteScope = (typeof allowedDeleteScopes)[number]
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
@@ -153,6 +157,12 @@ function registerIpcHandlers(database: AppDatabase): void {
     let statusChangedToDone = false
     let endDateChanged = false
     let dateDiffDays = 0
+    const nextRecurrence = payload.recurrence ?? currentTask.recurrence
+    const nextRecurrenceRule = payload.recurrence_rule !== undefined ? payload.recurrence_rule : currentTask.recurrence_rule
+    const recurrenceConfigurationChanged = payload.recurrence !== undefined || payload.recurrence_rule !== undefined
+    const recurrenceActuallyChanged =
+      recurrenceConfigurationChanged
+      && (nextRecurrence !== currentTask.recurrence || (nextRecurrenceRule ?? null) !== (currentTask.recurrence_rule ?? null))
     const previousParentTaskId = currentTask.parent_task_id
     let nextParentTaskId = currentTask.parent_task_id
 
@@ -219,8 +229,8 @@ function registerIpcHandlers(database: AppDatabase): void {
       if (payload.end_date !== currentTask.end_date) {
         endDateChanged = true
         if (payload.end_date && currentTask.end_date) {
-          const oldDate = new Date(currentTask.end_date)
-          const newDate = new Date(payload.end_date)
+          const oldDate = parseIsoDate(currentTask.end_date)
+          const newDate = parseIsoDate(payload.end_date)
           dateDiffDays = Math.round((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24))
         }
       }
@@ -333,12 +343,16 @@ function registerIpcHandlers(database: AppDatabase): void {
       }
     }
 
-    if (endDateChanged && dateDiffDays !== 0) {
+    if (endDateChanged && dateDiffDays !== 0 && !recurrenceActuallyChanged) {
       handleChainShift(database, taskId, dateDiffDays)
     }
 
-    if (payload.recurrence && payload.recurrence !== 'none' && payload.recurrence_rule) {
-       ensureIterations(database, taskId)
+    if (recurrenceActuallyChanged) {
+      deleteFutureRecurrenceChain(database, taskId)
+
+      if (nextRecurrence && nextRecurrence !== 'none' && nextRecurrenceRule) {
+        ensureIterations(database, taskId)
+      }
     }
 
     if (currentTask.parent_task_id !== null) {
@@ -373,15 +387,39 @@ function registerIpcHandlers(database: AppDatabase): void {
     return { conflicts }
   })
 
-  ipcMain.handle('tasks:delete', (_event, rawTaskId: number): void => {
+  ipcMain.handle('tasks:delete', (_event, rawTaskId: number, rawScope: DeleteScope = 'single'): void => {
     const taskId = Number(rawTaskId)
+    const scope = rawScope ?? 'single'
 
     if (!Number.isInteger(taskId) || taskId <= 0) {
       throw new Error('Invalid task ID')
     }
 
+    if (!allowedDeleteScopes.includes(scope)) {
+      throw new Error('Invalid delete scope')
+    }
+
     const currentTask = database.first<TaskWithRelations>(`SELECT * FROM tasks WHERE id = ${taskId}`)
     if (!currentTask) return
+
+    if (scope === 'future' || scope === 'all') {
+      const chainStartId = scope === 'all' ? getRecurrenceChainHeadId(database, taskId) : taskId
+      const chainIds = getForwardRecurrenceChainIds(database, chainStartId)
+
+      if (chainIds.length === 0) {
+        return
+      }
+
+      const parentTaskIds = getParentTaskIdsForTaskIds(database, chainIds)
+      deleteTasksByIds(database, chainIds)
+
+      for (const parentId of parentTaskIds) {
+        recalculateGoalBounds(database, parentId)
+      }
+
+      return
+    }
+
     const parentTaskId = currentTask.parent_task_id
 
     const prevId = currentTask.previous_recurrent_id
@@ -759,6 +797,53 @@ function registerIpcHandlers(database: AppDatabase): void {
 
     database.execute(`DELETE FROM custom_free_days WHERE date = '${date}';`)
   })
+
+  // --- Data Export/Import ----------------------------------------------------
+
+  ipcMain.handle('data:export', async (): Promise<{ success: boolean; taskCount?: number; error?: string }> => {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const result = await dialog.showSaveDialog(mainWindow!, {
+        title: 'Export Data',
+        defaultPath: `taskapp_backup_${today}.zip`,
+        filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { success: false }
+      }
+
+      const { taskCount, buffer } = exportDataToZip(database)
+      writeFileSync(result.filePath, buffer)
+
+      return { success: true, taskCount }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Export failed'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('data:import', async (): Promise<{ success: boolean; taskCount?: number; totalRecords?: number; error?: string }> => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow!, {
+        title: 'Import Data',
+        filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+        properties: ['openFile'],
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false }
+      }
+
+      const zipBuffer = readFileSync(result.filePaths[0])
+      const importResult = importDataFromZip(database, zipBuffer)
+
+      return { success: true, taskCount: importResult.taskCount, totalRecords: importResult.totalRecords }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Import failed'
+      return { success: false, error: message }
+    }
+  })
 }
 
 function buildTaskDeletionStatements(taskFilterSql: string): string[] {
@@ -838,7 +923,7 @@ function isHoliday(date: Date): boolean {
 }
 
 function toIsoDate(date: Date): string {
-  return date.toISOString().split('T')[0]
+  return toBusinessIsoDate(date)
 }
 
 function getNextValidDate(date: Date, recurrence: 'weekly' | 'monthly', rule: string): Date {
@@ -898,7 +983,7 @@ function ensureIterations(database: AppDatabase, taskId: number): void {
   for (let i = 0; i < needed; i++) {
     if (!lastTask) break
 
-    const baseDate = lastTask.end_date ? new Date(lastTask.end_date) : new Date()
+    const baseDate = lastTask.end_date ? parseIsoDate(lastTask.end_date) : new Date()
     const nextDate = getNextValidDate(
       baseDate,
       task.recurrence as 'weekly' | 'monthly',
@@ -908,7 +993,7 @@ function ensureIterations(database: AppDatabase, taskId: number): void {
     // Calculate start date by keeping the same duration if possible
     let nextStartDate: string | null = null
     if (task.start_date && task.end_date) {
-      const duration = new Date(task.end_date).getTime() - new Date(task.start_date).getTime()
+      const duration = parseIsoDate(task.end_date).getTime() - parseIsoDate(task.start_date).getTime()
       const start = new Date(nextDate.getTime() - duration)
       nextStartDate = toIsoDate(start)
     }
@@ -952,13 +1037,13 @@ function handleChainShift(database: AppDatabase, taskId: number, dateDiffDays: n
   const statements: string[] = []
   
   if (nextTask.start_date) {
-    const d = new Date(nextTask.start_date)
+    const d = parseIsoDate(nextTask.start_date)
     d.setDate(d.getDate() + dateDiffDays)
     statements.push(`UPDATE tasks SET start_date = '${toIsoDate(d)}' WHERE id = ${nextTask.id}`)
   }
   
   if (nextTask.end_date) {
-    const d = new Date(nextTask.end_date)
+    const d = parseIsoDate(nextTask.end_date)
     d.setDate(d.getDate() + dateDiffDays)
     statements.push(`UPDATE tasks SET end_date = '${toIsoDate(d)}' WHERE id = ${nextTask.id}`)
   }
@@ -967,6 +1052,95 @@ function handleChainShift(database: AppDatabase, taskId: number, dateDiffDays: n
     database.transaction(statements)
     handleChainShift(database, nextTask.id, dateDiffDays)
   }
+}
+
+function deleteFutureRecurrenceChain(database: AppDatabase, taskId: number): void {
+  const futureTaskIds = database.query<{ id: number }>(`
+    WITH RECURSIVE future_chain(id) AS (
+      SELECT id FROM tasks WHERE previous_recurrent_id = ${taskId}
+      UNION ALL
+      SELECT t.id
+      FROM tasks t
+      JOIN future_chain chain ON t.previous_recurrent_id = chain.id
+    )
+    SELECT id FROM future_chain;
+  `)
+
+  if (futureTaskIds.length === 0) {
+    return
+  }
+
+  const idList = futureTaskIds.map((row) => row.id).join(', ')
+
+  database.transaction([
+    `DELETE FROM task_tags WHERE task_id IN (${idList});`,
+    `DELETE FROM dependencies WHERE task_id IN (${idList}) OR depends_on_task_id IN (${idList});`,
+    `DELETE FROM tasks WHERE id IN (${idList});`,
+  ])
+}
+
+function getRecurrenceChainHeadId(database: AppDatabase, taskId: number): number {
+  let headId = taskId
+
+  while (true) {
+    const previous = database.first<{ previous_recurrent_id: number | null }>(
+      `SELECT previous_recurrent_id FROM tasks WHERE id = ${headId} LIMIT 1`,
+    )
+
+    if (!previous || previous.previous_recurrent_id === null) {
+      break
+    }
+
+    headId = previous.previous_recurrent_id
+  }
+
+  return headId
+}
+
+function getForwardRecurrenceChainIds(database: AppDatabase, startTaskId: number): number[] {
+  const rows = database.query<{ id: number }>(`
+    WITH RECURSIVE recurrence_chain(id) AS (
+      SELECT id FROM tasks WHERE id = ${startTaskId}
+      UNION ALL
+      SELECT t.id
+      FROM tasks t
+      JOIN recurrence_chain chain ON t.previous_recurrent_id = chain.id
+    )
+    SELECT id FROM recurrence_chain;
+  `)
+
+  return rows.map((row) => row.id)
+}
+
+function getParentTaskIdsForTaskIds(database: AppDatabase, taskIds: number[]): number[] {
+  if (taskIds.length === 0) {
+    return []
+  }
+
+  const idList = taskIds.join(', ')
+  const rows = database.query<{ parent_task_id: number | null }>(`
+    SELECT DISTINCT parent_task_id
+    FROM tasks
+    WHERE id IN (${idList}) AND parent_task_id IS NOT NULL;
+  `)
+
+  return rows
+    .map((row) => row.parent_task_id)
+    .filter((parentId): parentId is number => Number.isInteger(parentId) && parentId > 0)
+}
+
+function deleteTasksByIds(database: AppDatabase, taskIds: number[]): void {
+  if (taskIds.length === 0) {
+    return
+  }
+
+  const idList = taskIds.join(', ')
+
+  database.transaction([
+    `DELETE FROM task_tags WHERE task_id IN (${idList});`,
+    `DELETE FROM dependencies WHERE task_id IN (${idList}) OR depends_on_task_id IN (${idList});`,
+    `DELETE FROM tasks WHERE id IN (${idList});`,
+  ])
 }
 
 function recalculateGoalBounds(database: AppDatabase, taskId: number): void {

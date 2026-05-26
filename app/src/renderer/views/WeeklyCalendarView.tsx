@@ -1,22 +1,24 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   startOfWeek,
   addDays,
   format,
   isSameDay,
+  isToday,
   parseISO,
   isWithinInterval,
   startOfDay
 } from 'date-fns';
 import { isWorkingDay } from '../utils/dateUtils';
-import type { TaskWithRelations } from '../../common/types';
+import type { Project, TaskWithRelations } from '../../common/types';
 import type { QuickCreateOptions } from '../components/ViewManager';
 
 interface WeeklyCalendarViewProps {
   tasks: TaskWithRelations[];
+  projects: Project[];
   onSelectTask: (taskId: number) => void;
   selectedTaskId: number | null;
-  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<void>;
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>;
   projectId: number | null;
   currentDate: Date;
 }
@@ -63,6 +65,7 @@ function isMultiDay(task: TaskWithRelations): boolean {
 
 export default function WeeklyCalendarView({
   tasks,
+  projects,
   onSelectTask,
   selectedTaskId,
   onCreateTask,
@@ -71,6 +74,22 @@ export default function WeeklyCalendarView({
 }: WeeklyCalendarViewProps) {
   const [addingTaskForDay, setAddingTaskForDay] = useState<Date | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+
+  const taskById = useMemo(() => {
+    const map = new Map<number, TaskWithRelations>();
+    tasks.forEach((task) => {
+      map.set(task.id, task);
+    });
+    return map;
+  }, [tasks]);
+
+  const projectColorMap = useMemo(() => {
+    const map = new Map<number, string>();
+    projects.forEach((project) => {
+      map.set(project.id, project.color);
+    });
+    return map;
+  }, [projects]);
 
   // Generate the 7 days of the week starting from Monday
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -87,6 +106,31 @@ export default function WeeklyCalendarView({
 
   // Single-day tasks: everything else (single date or same start/end)
   const singleDayTasks = calendarTasks.filter((t) => !isMultiDay(t));
+
+  const goalTitleByTaskId = useMemo(() => {
+    const map = new Map<number, string>();
+
+    calendarTasks.forEach((task) => {
+      let parentId = task.parent_task_id;
+
+      while (parentId !== null) {
+        const parentTask = taskById.get(parentId);
+
+        if (!parentTask) {
+          break;
+        }
+
+        if (parentTask.type === 'goal') {
+          map.set(task.id, parentTask.title);
+          break;
+        }
+
+        parentId = parentTask.parent_task_id;
+      }
+    });
+
+    return map;
+  }, [calendarTasks, taskById]);
 
   const handleCreateTask = async (day: Date) => {
     if (!newTaskTitle.trim()) {
@@ -164,17 +208,18 @@ export default function WeeklyCalendarView({
           {weekDays.map((day, idx) => {
             const { total, isOver } = getCapacity(day);
             const isWeekendDay = !isWorkingDay(day);
+            const isCurrentDay = isToday(day);
             return (
               <div 
                 key={day.toISOString()} 
-                className={`weekly-day-col ${isWeekendDay ? 'weekly-weekend-pattern' : ''}`}
+                className={`weekly-day-col ${isWeekendDay ? 'weekly-weekend-pattern' : ''} ${isCurrentDay ? 'weekly-day-col--today' : ''}`}
                 style={{ flex: idx < 5 ? 2 : 1 }}
               >
                 <div className="weekly-day-header">
                   <div style={{ textTransform: 'uppercase', fontSize: '10px', color: '#64748b' }}>
                     {format(day, 'EEE')}
                   </div>
-                  <div style={{ fontSize: '1.125rem', fontWeight: 700, marginTop: '0.25rem' }}>
+                  <div className={isCurrentDay ? 'weekly-day-number--today' : ''} style={{ fontSize: '1.125rem', fontWeight: 700, marginTop: '0.25rem' }}>
                     {format(day, 'd')}
                   </div>
                   {!isWeekendDay && (
@@ -196,6 +241,8 @@ export default function WeeklyCalendarView({
             {multiDayTasks.map((task, index) => {
                 const { visualStartIdx, visualEndIdx } = getVisualIndices(task);
                 const { left, width } = getTotalWidthPercentage(visualStartIdx, visualEndIdx);
+              const goalSubtitle = goalTitleByTaskId.get(task.id);
+              const projectColor = task.project_id ? projectColorMap.get(task.project_id) ?? '#3b82f6' : '#3b82f6';
 
                 return (
                     <div 
@@ -206,10 +253,11 @@ export default function WeeklyCalendarView({
                             left, 
                             width, 
                             top: `${index * 3}rem`, 
-                            backgroundColor: '#3b82f6'
+                          backgroundColor: projectColor
                         }}
                         onClick={() => onSelectTask(task.id)}
                     >
+                      {goalSubtitle && <div className="weekly-task-goal-subtitle">{goalSubtitle}</div>}
                         <strong>{task.title}</strong>
                         <div style={{ fontSize: '10px', opacity: 0.8 }}>
                             {task.project_name || 'No Project'}
@@ -222,29 +270,39 @@ export default function WeeklyCalendarView({
           <div style={{ display: 'flex', width: '100%' }}>
             {weekDays.map((day, idx) => {
               const isWeekendDay = !isWorkingDay(day);
+              const isCurrentDay = isToday(day);
               // Single-day tasks for this day (check start_date OR end_date)
               const dayTasks = singleDayTasks.filter((t) => taskFallsOnDay(t, day));
               
               return (
                 <div 
                   key={`body-${day.toISOString()}`} 
-                  className={`weekly-day-body ${isWeekendDay ? 'weekly-weekend-pattern' : ''}`}
+                  className={`weekly-day-body ${isWeekendDay ? 'weekly-weekend-pattern' : ''} ${isCurrentDay ? 'weekly-day-body--today' : ''}`}
                   style={{ flex: idx < 5 ? 2 : 1 }}
                 >
                   <div style={{ height: multiDaySpacerHeight }}></div> {/* Dynamic spacer for multiday tasks */}
                   
-                  {dayTasks.map(task => (
-                    <div 
-                        key={task.id} 
+                  {dayTasks.map((task) => {
+                    const goalSubtitle = goalTitleByTaskId.get(task.id);
+                    const projectColor = task.project_id ? projectColorMap.get(task.project_id) ?? '#94a3b8' : '#94a3b8';
+                    return (
+                      <div
+                        key={task.id}
                         className="weekly-single-task"
                         data-details-trigger="open"
                         onClick={() => onSelectTask(task.id)}
-                        style={{ borderLeft: task.id === selectedTaskId ? '3px solid #3b82f6' : undefined }}
-                    >
-                      <div style={{ fontSize: '10px', color: '#64748b' }}>{task.project_name || 'No Project'}</div>
-                      <strong>{task.title}</strong>
-                    </div>
-                  ))}
+                        style={{
+                          borderLeft: `5px solid ${projectColor}`,
+                          borderRadius: '0.5rem',
+                          boxShadow: task.id === selectedTaskId ? `0 0 0 1px ${projectColor} inset` : undefined,
+                        }}
+                      >
+                        {goalSubtitle && <div className="weekly-task-goal-subtitle">{goalSubtitle}</div>}
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>{task.project_name || 'No Project'}</div>
+                        <strong>{task.title}</strong>
+                      </div>
+                    );
+                  })}
 
                   <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
                     {addingTaskForDay && isSameDay(addingTaskForDay, day) ? (

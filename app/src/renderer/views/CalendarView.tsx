@@ -1,30 +1,32 @@
 import React, { useState } from 'react';
 import { addDays, format } from 'date-fns';
-import type { TaskWithRelations } from '../../common/types';
+import type { Project, TaskWithRelations } from '../../common/types';
 import type { QuickCreateOptions } from '../components/ViewManager';
 import WeeklyCalendarView from './WeeklyCalendarView';
 
 interface CalendarViewProps {
   tasks: TaskWithRelations[];
+  projects: Project[];
   onSelectTask: (taskId: number) => void;
   selectedTaskId: number | null;
-  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<void>;
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>;
   projectId: number | null;
 }
 
 export default function CalendarView({
   tasks,
+  projects,
   onSelectTask,
   selectedTaskId,
   onCreateTask,
   projectId
 }: CalendarViewProps) {
   const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly');
-  const [currentDate, setCurrentDate] = useState(new Date('2026-05-22T00:00:00')); // Hardcoded based on context, but typically Date.now()
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const handlePrev = () => setCurrentDate((prev) => addDays(prev, viewMode === 'weekly' ? -7 : -30));
   const handleNext = () => setCurrentDate((prev) => addDays(prev, viewMode === 'weekly' ? 7 : 30));
-  const handleToday = () => setCurrentDate(new Date('2026-05-22T00:00:00'));
+  const handleToday = () => setCurrentDate(new Date());
 
   return (
     <div className="weekly-calendar">
@@ -62,6 +64,7 @@ export default function CalendarView({
       {viewMode === 'weekly' ? (
         <WeeklyCalendarView 
           tasks={tasks}
+          projects={projects}
           onSelectTask={onSelectTask}
           selectedTaskId={selectedTaskId}
           onCreateTask={onCreateTask}

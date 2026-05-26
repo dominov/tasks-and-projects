@@ -1,4 +1,4 @@
-import type { Project, TaskWithRelations } from '../../common/types'
+import type { Category, Project, Tag, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
 import TaskTable from '../components/TaskTable'
 import type { QuickCreateOptions } from '../components/ViewManager'
 
@@ -8,12 +8,16 @@ interface TableViewProps {
   createType?: 'task' | 'goal'
   tasks: TaskWithRelations[]
   projects: Project[]
+  categories: Category[]
+  tags: Tag[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
   projectId: number | null
   categoryId: number | null
   tagId: number | null
-  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<void>
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>
+  onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
+  onDeleteTask: (taskId: number) => Promise<void>
   onCreateGoalSubtask?: (goalId: number, title: string) => Promise<void>
 }
 
@@ -23,12 +27,16 @@ function TableView({
   createType = 'task',
   tasks,
   projects,
+  categories,
+  tags,
   onSelectTask,
   selectedTaskId,
   projectId,
   categoryId,
   tagId,
   onCreateTask,
+  onUpdateTask,
+  onDeleteTask,
   onCreateGoalSubtask,
 }: TableViewProps) {
   return (
@@ -40,6 +48,8 @@ function TableView({
       <TaskTable
         tasks={tasks}
         projects={projects}
+        categories={categories}
+        tags={tags}
         onSelectTask={onSelectTask}
         selectedTaskId={selectedTaskId}
         projectId={projectId}
@@ -47,6 +57,8 @@ function TableView({
         tagId={tagId}
         createType={createType}
         onCreateTask={onCreateTask}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={onDeleteTask}
         onCreateGoalSubtask={onCreateGoalSubtask}
       />
     </section>

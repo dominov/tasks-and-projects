@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nokia Personal Task Management - Gantt View</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+    /* Estilo de fin de semana en el Gantt */
+    .gantt-weekend {
+      background-image: repeating-linear-gradient(45deg, #1e293b 0px, #1e293b 4px, #0f172a 4px, #0f172a 8px);
+      opacity: 0.4;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen overflow-hidden select-none">
+
+  <!-- BARRA DE TÍTULO DE VENTANA (Estilo Electron) -->
+  <div class="h-9 bg-slate-950 flex items-center justify-between px-3 border-b border-slate-800 text-xs text-slate-400 shrink-0">
+    <div class="flex items-center space-x-4">
+      <span class="font-bold text-amber-500 flex items-center gap-1">
+        <i data-lucide="crown" class="w-4 h-4"></i>
+      </span>
+      <div class="flex space-x-3">
+        <span class="hover:text-slate-200 cursor-pointer">File</span>
+        <span class="hover:text-slate-200 cursor-pointer">Edit</span>
+        <span class="hover:text-slate-200 cursor-pointer">View</span>
+        <span class="hover:text-slate-200 cursor-pointer">Window</span>
+      </div>
+    </div>
+    <div class="text-slate-400 font-medium">Personal Task Management</div>
+    <div class="flex items-center space-x-3">
+      <button class="hover:text-slate-200"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+      <button class="hover:text-slate-200"><i data-lucide="square" class="w-3 h-3"></i></button>
+      <button class="hover:text-rose-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- SECCIÓN 1: MENÚ LATERAL IZQUIERDO -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between overflow-y-auto shrink-0">
+      <div class="p-4 space-y-6">
+        
+        <!-- Navegación Principal -->
+        <nav class="space-y-1">
+          <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+            <span class="flex items-center gap-3 text-sm font-medium">
+              <i data-lucide="calendar-days" class="w-4 h-4"></i> Today
+            </span>
+            <span class="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">3</span>
+          </a>
+          <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+            <span class="flex items-center gap-3 text-sm font-medium">
+              <i data-lucide="check-square" class="w-4 h-4"></i> My Tasks
+            </span>
+            <span class="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-405">11</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition text-sm font-medium">
+            <i data-lucide="target" class="w-4 h-4"></i> Goals
+          </a>
+          <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition text-sm font-medium">
+            <i data-lucide="calendar" class="w-4 h-4"></i> Calendar
+          </a>
+          <!-- Tab de Gantt Activo -->
+          <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-600/10 border border-blue-500/20 text-blue-400 transition text-sm font-semibold">
+            <i data-lucide="milestone" class="w-4 h-4"></i> Gantt Diagram
+          </a>
+        </nav>
+
+        <!-- Proyectos -->
+        <div class="space-y-2">
+          <div class="px-3 text-[10px] font-bold text-slate-550 uppercase tracking-wider">Projects</div>
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> NETSALES / OI
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> CNS Combo Actuals
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Risk and Upside
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Perfil -->
+      <div class="p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white text-[10px]">
+            PM
+          </div>
+          <div>
+            <p class="font-medium text-slate-200">Nokia TPM</p>
+            <p class="text-[10px] text-slate-500">v1.4.0</p>
+          </div>
+        </div>
+        <button class="hover:text-slate-200 transition"><i data-lucide="settings" class="w-4 h-4"></i></button>
+      </div>
+    </aside>
+
+    <!-- SECCIÓN 2: DIAGRAMA DE GANTT (DISEÑO PREMIUM E INTERACTIVO) -->
+    <main class="flex-1 bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
+      
+      <!-- Cabecera Gantt -->
+      <div class="p-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div>
+          <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest font-mono">TIMELINE FLOW</span>
+          <h1 class="text-2xl font-bold text-slate-100 tracking-tight">Gantt Diagram</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Arrastra las barras para reprogramar. Las subtareas dependientes se moverán automáticamente.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-xs bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2 text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            <span>Arrastrar barra = Cambia Inicio</span>
+          </div>
+          <button class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-md">
+            <i data-lucide="presentation" class="w-4 h-4"></i> Presentation Mode
+          </button>
+        </div>
+      </div>
+
+      <!-- Espacio de Trabajo del Gantt -->
+      <div class="flex-1 flex overflow-hidden">
+        
+        <!-- PANEL IZQUIERDO: LISTA DE TAREAS Y METAS -->
+        <div class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 overflow-hidden">
+          <!-- Cabecera panel -->
+          <div class="h-10 border-b border-slate-800 bg-slate-950/40 flex items-center px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Tareas & Objetivos
+          </div>
+          <!-- Items List -->
+          <div id="gantt-task-list" class="flex-1 overflow-y-auto divide-y divide-slate-800/50">
+            <!-- Se llena dinámicamente con JS -->
+          </div>
+        </div>
+
+        <!-- PANEL DERECHO: CRONOGRAMA INTERACTIVO -->
+        <div class="flex-1 overflow-auto bg-slate-950 relative" id="gantt-timeline-container" onscroll="syncGanttScroll()">
+          
+          <!-- Contenedor interno del Gantt (Ancho fijo que simula el tiempo) -->
+          <div class="w-[1440px] h-full flex flex-col relative select-none">
+            
+            <!-- Encabezado de Fechas (Mayo - Junio) -->
+            <div class="h-10 bg-slate-900/80 border-b border-slate-800 flex items-center relative shrink-0">
+              <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider">Mayo / Junio 2026</div>
+              <!-- Rejilla de días -->
+              <div id="gantt-day-headers" class="w-full h-full pt-4 grid grid-cols-24">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+
+            <!-- CUERPO DE FILAS Y BARRAS -->
+            <div class="flex-1 relative" id="gantt-rows-container">
+              
+              <!-- Capa de Rejilla de Fondo -->
+              <div id="gantt-grid-background" class="absolute inset-0 grid grid-cols-24 pointer-events-none divide-x divide-slate-800/30">
+                <!-- Generado por JS -->
+              </div>
+
+              <!-- Capa de SVG para conectar Dependencias -->
+              <svg class="absolute inset-0 pointer-events-none z-20 w-full h-full" id="gantt-dependency-svg">
+                <!-- Marcador de flecha para conectores -->
+                <defs>
+                  <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#64748b" />
+                  </marker>
+                </defs>
+                <!-- Las líneas se dibujan dinámicamente -->
+              </svg>
+
+              <!-- Capa de Barras de Tareas -->
+              <div id="gantt-bars-container" class="absolute inset-0 z-10 py-1">
+                <!-- Generado por JS -->
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+
+    <!-- PANEL DERECHO: DETALLES & EDITOR DE DEPENDENCIAS -->
+    <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col justify-between overflow-y-auto shrink-0">
+      <div class="p-6 space-y-6">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="edit-3" class="w-4 h-4 text-blue-500"></i> Editar Atributos
+          </h2>
+          <span class="text-[10px] font-bold text-slate-500">Gantt Controller</span>
+        </div>
+
+        <!-- Editor de Tarea Seleccionada -->
+        <div class="space-y-4">
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nombre de Tarea:</label>
+            <input type="text" id="edit-task-name" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-250 focus:outline-none focus:border-blue-500" oninput="saveSelectedTask()">
+          </div>
+
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Duración (Días):</label>
+            <input type="number" id="edit-task-duration" min="1" max="15" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-250 focus:outline-none focus:border-blue-500" oninput="saveSelectedTask()">
+          </div>
+
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Depende de (Predecesora):</label>
+            <select id="edit-task-dependency" class="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs px-3 py-2 text-slate-250 focus:outline-none focus:border-blue-500" onchange="saveSelectedTask()">
+              <!-- Se llena con JS -->
+            </select>
+          </div>
+
+          <div class="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2 text-xs">
+            <span class="font-bold text-slate-400 block flex items-center gap-1">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-blue-400"></i> Regla de Dependencia
+            </span>
+            <p class="text-[11px] text-slate-500 leading-relaxed">
+              La tarea sucesora no puede empezar hasta que la predecesora finalice. Si mueves la predecesora hacia adelante, la sucesora se desplazará automáticamente para evitar conflictos.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-slate-950/40">
+        <button onclick="resetGanttData()" class="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold text-xs py-2 rounded-lg transition flex items-center justify-center gap-1.5">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Restablecer Cronograma
+        </button>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    // Configuración Inicial de Datos (Gantt)
+    // Usamos offsets de día relativos para simular el rango del 18 de mayo al 10 de junio
+    // Rango total: 24 días para renderizado
+    const DAYS_COUNT = 24;
+    const START_DATE_EPOCH = new Date(2026, 4, 18); // 18 de Mayo 2026
+
+    let tasks = [
+      // GRUPO 1: Update customer hierarchy NET SALES
+      { id: 1, name: "Update customer hierarchy NET SALES", isHeader: true, project: "NETSALES / OI" },
+      { id: 2, name: "primera", startDay: 1, duration: 3, dependency: null, color: "from-indigo-500 to-indigo-600", isHeader: false },
+      { id: 3, name: "Segunda", startDay: 4, duration: 2, dependency: 2, color: "from-indigo-400 to-indigo-500", isHeader: false },
+      { id: 4, name: "Cuarta", startDay: 6, duration: 4, dependency: 3, color: "from-blue-500 to-blue-600", isHeader: false },
+      { id: 5, name: "tercera", startDay: 10, duration: 2, dependency: 4, color: "from-sky-500 to-sky-600", isHeader: false },
+
+      // GRUPO 2: Connet Risk and Upside with External BD
+      { id: 6, name: "Connet Risk and Upside with External BD", isHeader: true, project: "Risk and Upside" },
+      { id: 7, name: "transformar datos", startDay: 0, duration: 2, dependency: null, color: "from-amber-500 to-amber-600", isHeader: false },
+      { id: 8, name: "Leer la base de datos", startDay: 2, duration: 3, dependency: 7, color: "from-amber-600 to-amber-700", isHeader: false },
+
+      // GRUPO 3: Update Product Hierarchy
+      { id: 9, name: "Update Product Hierarchy", isHeader: true, project: "CNS Combo Actuals" },
+      { id: 10, name: "update p20", startDay: 3, duration: 4, dependency: null, color: "from-emerald-500 to-emerald-600", isHeader: false },
+      { id: 11, name: "update QTC", startDay: 7, duration: 2, dependency: 10, color: "from-emerald-600 to-teal-600", isHeader: false },
+      { id: 12, name: "Update BPP", startDay: 12, duration: 3, dependency: 11, color: "from-teal-500 to-cyan-600", isHeader: false }
+    ];
+
+    // Clon para poder restablecer
+    const initialTasksBackup = JSON.parse(JSON.stringify(tasks));
+
+    let selectedTaskId = 2; // "primera" seleccionada por defecto
+    let isDragging = false;
+    let dragTaskId = null;
+    let dragStartOffset = 0;
+    let dragStartCol = 0;
+
+    // Sincronizar el scroll de las cabeceras con el fondo del timeline
+    function syncGanttScroll() {
+      // Sincronización automática de scroll si hubiera división
+    }
+
+    // Inicializar e inyectar elementos al cargar la página
+    window.onload = function() {
+      lucide.createIcons();
+      buildGridAndHeaders();
+      renderGantt();
+      populateDependencyDropdown();
+      selectTaskToEdit(selectedTaskId);
+    };
+
+    function buildGridAndHeaders() {
+      const headersContainer = document.getElementById('gantt-day-headers');
+      const gridBgContainer = document.getElementById('gantt-grid-background');
+      
+      headersContainer.innerHTML = '';
+      gridBgContainer.innerHTML = '';
+
+      // Ajustamos el grid layout del Tailwind dinámicamente
+      headersContainer.style.gridTemplateColumns = `repeat(${DAYS_COUNT}, 1fr)`;
+      gridBgContainer.style.gridTemplateColumns = `repeat(${DAYS_COUNT}, 1fr)`;
+
+      for (let i = 0; i < DAYS_COUNT; i++) {
+        const currentDate = new Date(START_DATE_EPOCH);
+        currentDate.setDate(START_DATE_EPOCH.getDate() + i);
+        
+        const dayNum = currentDate.getDate();
+        const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+
+        // Header día
+        const dayHeader = document.createElement('div');
+        dayHeader.className = `flex flex-col items-center justify-center text-[10px] font-bold border-r border-slate-800/40 h-full ${isWeekend ? 'bg-slate-900/40 text-slate-500' : 'text-slate-400'}`;
+        dayHeader.innerHTML = `<span>${dayNum}</span>`;
+        headersContainer.appendChild(dayHeader);
+
+        // Columna de fondo del Grid
+        const gridCol = document.createElement('div');
+        gridCol.className = `h-full ${isWeekend ? 'gantt-weekend' : ''}`;
+        gridBgContainer.appendChild(gridCol);
+      }
+    }
+
+    function renderGantt() {
+      const listContainer = document.getElementById('gantt-task-list');
+      const barsContainer = document.getElementById('gantt-bars-container');
+      
+      listContainer.innerHTML = '';
+      barsContainer.innerHTML = '';
+
+      tasks.forEach((task, index) => {
+        // 1. Renderizar fila en el panel de la izquierda
+        const rowLeft = document.createElement('div');
+        rowLeft.className = `h-12 flex items-center px-4 transition ${task.isHeader ? 'bg-slate-950/60 font-bold text-slate-300 border-l-4 border-blue-500' : 'hover:bg-slate-800/40 cursor-pointer text-slate-400'}`;
+        if (!task.isHeader && task.id === selectedTaskId) {
+          rowLeft.className += ' bg-slate-800/65 text-slate-100 border-r-2 border-blue-500';
+        }
+        
+        rowLeft.onclick = () => {
+          if (!task.isHeader) {
+            selectTaskToEdit(task.id);
+          }
+        };
+
+        if (task.isHeader) {
+          rowLeft.innerHTML = `
+            <div class="flex items-center gap-2 truncate">
+              <i data-lucide="folder-git2" class="w-4 h-4 text-slate-400"></i>
+              <span class="text-xs truncate font-bold">${task.name}</span>
+            </div>
+          `;
+        } else {
+          rowLeft.innerHTML = `
+            <div class="flex items-center gap-3 w-full justify-between pr-2">
+              <span class="text-xs truncate font-medium pl-4 flex items-center gap-1">
+                <i data-lucide="corner-down-right" class="w-3.5 h-3.5 text-slate-600"></i> ${task.name}
+              </span>
+              <span class="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-mono">${task.duration}d</span>
+            </div>
+          `;
+        }
+        listContainer.appendChild(rowLeft);
+
+        // 2. Renderizar fila de barra en el panel derecho (Timeline)
+        const rowRight = document.createElement('div');
+        rowRight.className = `h-12 relative flex items-center ${task.isHeader ? 'bg-slate-950/20' : ''}`;
+        
+        if (!task.isHeader) {
+          // Calcular posiciones en porcentaje
+          const startPercent = (task.startDay / DAYS_COUNT) * 100;
+          const widthPercent = (task.duration / DAYS_COUNT) * 100;
+
+          const bar = document.createElement('div');
+          bar.className = `absolute h-8 bg-gradient-to-r ${task.color} rounded-lg shadow-md border border-white/10 flex items-center px-3 justify-between cursor-ew-resize hover:scale-[1.01] hover:brightness-110 active:scale-[0.99] transition-transform select-none z-10`;
+          bar.style.left = `${startPercent}%`;
+          bar.style.width = `${widthPercent}%`;
+          bar.id = `gantt-bar-${task.id}`;
+
+          // Evento Drag de ratón
+          bar.onmousedown = (e) => startDrag(e, task.id);
+
+          bar.innerHTML = `
+            <div class="truncate pr-1 text-[11px] font-bold text-white flex items-center gap-1.5 pointer-events-none">
+              <i data-lucide="grip-vertical" class="w-3 h-3 text-white/50"></i>
+              <span class="truncate">${task.name}</span>
+            </div>
+            <span class="text-[10px] font-bold bg-black/20 text-white/90 px-1.5 py-0.5 rounded shrink-0 pointer-events-none">${task.duration}d</span>
+          `;
+
+          rowRight.appendChild(bar);
+        } else {
+          // Es un header, mostramos el proyecto sombreado sutilmente
+          rowRight.innerHTML = `
+            <div class="absolute inset-0 bg-slate-900/10 pointer-events-none border-b border-slate-800/40"></div>
+          `;
+        }
+
+        barsContainer.appendChild(rowRight);
+      });
+
+      // Dibujar conectores SVG de dependencias
+      drawDependencyConnectors();
+      lucide.createIcons();
+    }
+
+    // Algoritmo de arrastre interactivo en el Gantt
+    function startDrag(e, taskId) {
+      isDragging = true;
+      dragTaskId = taskId;
+      const barEl = document.getElementById(`gantt-bar-${taskId}`);
+      const containerRect = document.getElementById('gantt-rows-container').getBoundingClientRect();
+      
+      const colWidth = containerRect.width / DAYS_COUNT;
+      const mouseXRelative = e.clientX - containerRect.left;
+      
+      const task = tasks.find(t => t.id === taskId);
+      // Calcular a qué distancia del inicio de la barra hicimos clic
+      const barLeftX = (task.startDay * colWidth);
+      dragStartOffset = mouseXRelative - barLeftX;
+
+      document.onmousemove = (ev) => {
+        if (!isDragging) return;
+        const currentMouseX = ev.clientX - containerRect.left;
+        let newLeftX = currentMouseX - dragStartOffset;
+        
+        // Limitar márgenes
+        if (newLeftX < 0) newLeftX = 0;
+        if (newLeftX > containerRect.width - (task.duration * colWidth)) {
+          newLeftX = containerRect.width - (task.duration * colWidth);
+        }
+
+        // Convertir coordenada X a columna del grid
+        const newStartCol = Math.round(newLeftX / colWidth);
+        if (newStartCol !== task.startDay && newStartCol >= 0 && newStartCol + task.duration <= DAYS_COUNT) {
+          task.startDay = newStartCol;
+          
+          // PROPAGACIÓN EN CASCADA DE DEPENDENCIAS (Finish-to-Start)
+          propagateCascade(taskId);
+          
+          renderGantt();
+        }
+      };
+
+      document.onmouseup = () => {
+        isDragging = false;
+        dragTaskId = null;
+        document.onmousemove = null;
+        document.onmouseup = null;
+        selectTaskToEdit(taskId);
+      };
+    }
+
+    // Algoritmo recursivo en cascada para mover dependencias sucesoras automáticamente
+    function propagateCascade(predecessorId) {
+      const predTask = tasks.find(t => t.id === predecessorId);
+      if (!predTask) return;
+
+      const predEndDay = predTask.startDay + predTask.duration;
+
+      tasks.forEach(successor => {
+        if (!successor.isHeader && successor.dependency === predecessorId) {
+          // Regla: la sucesora no puede empezar antes del fin de la predecesora
+          if (successor.startDay < predEndDay) {
+            successor.startDay = predEndDay;
+            // Recursión para propagar a los descendientes de la sucesora
+            propagateCascade(successor.id);
+          }
+        }
+      });
+    }
+
+    // Dibujar conectores SVG de dependencias
+    function drawDependencyConnectors() {
+      const svg = document.getElementById('gantt-dependency-svg');
+      // Limpiar conexiones previas
+      svg.querySelectorAll('path').forEach(p => p.remove());
+
+      const containerRect = document.getElementById('gantt-rows-container').getBoundingClientRect();
+      const colWidth = containerRect.width / DAYS_COUNT;
+      const rowHeight = 48; // Altura de fila de 12 (h-12 = 48px)
+
+      tasks.forEach((task, index) => {
+        if (!task.isHeader && task.dependency) {
+          const parentIndex = tasks.findIndex(t => t.id === task.dependency);
+          const parentTask = tasks[parentIndex];
+          if (!parentTask) return;
+
+          // Coordenadas final tarea predecesora
+          const x1 = ((parentTask.startDay + parentTask.duration) * colWidth);
+          const y1 = (parentIndex * rowHeight) + (rowHeight / 2);
+
+          // Coordenadas inicio tarea sucesora
+          const x2 = (task.startDay * colWidth);
+          const y2 = (index * rowHeight) + (rowHeight / 2);
+
+          // Dibujar línea conectora angular inteligente (tipo diagrama Gantt MS Project)
+          const midX = x1 + 12; // Pequeño offset a la derecha
+          
+          let pathD = ``;
+          if (x2 >= x1) {
+            // El inicio de la sucesora está después del fin de la predecesora (Normal)
+            pathD = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+          } else {
+            // Caso colisión (si se rompe la regla momentáneamente al renderizar)
+            pathD = `M ${x1} ${y1} L ${x1 + 8} ${y1} L ${x1 + 8} ${y2 - 12} L ${x2 - 8} ${y2 - 12} L ${x2 - 8} ${y2} L ${x2} ${y2}`;
+          }
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', pathD);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', '#64748b'); // Slate-500
+          path.setAttribute('stroke-width', '2');
+          path.setAttribute('marker-end', 'url(#arrow)');
+          path.setAttribute('class', 'transition-all duration-300');
+
+          svg.appendChild(path);
+        }
+      });
+    }
+
+    // Editor Lateral
+    function selectTaskToEdit(id) {
+      selectedTaskId = id;
+      const task = tasks.find(t => t.id === id);
+      if (!task || task.isHeader) return;
+
+      document.getElementById('edit-task-name').value = task.name;
+      document.getElementById('edit-task-duration').value = task.duration;
+
+      // Actualizar select de dependencias excluyendo a sí misma y headers
+      const selectDep = document.getElementById('edit-task-dependency');
+      selectDep.innerHTML = '<option value="">(Ninguna)</option>';
+
+      tasks.forEach(t => {
+        if (!t.isHeader && t.id !== id) {
+          const isSelected = task.dependency === t.id ? 'selected' : '';
+          selectDep.innerHTML += `<option value="${t.id}" ${isSelected}>${t.name}</option>`;
+        }
+      });
+
+      renderGantt();
+    }
+
+    function saveSelectedTask() {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      if (!task) return;
+
+      const newName = document.getElementById('edit-task-name').value;
+      const newDuration = parseInt(document.getElementById('edit-task-duration').value);
+      const newDepValue = document.getElementById('edit-task-dependency').value;
+      const newDep = newDepValue ? parseInt(newDepValue) : null;
+
+      if (newName) task.name = newName;
+      if (newDuration && newDuration > 0) {
+        task.duration = newDuration;
+        // Al cambiar la duración, también propagamos cascada de inmediato
+        propagateCascade(task.id);
+      }
+      
+      task.dependency = newDep;
+      
+      // Validar que al asignar dependencia se cumpla la restricción de inicio
+      if (newDep) {
+        propagateCascade(newDep);
+      }
+
+      renderGantt();
+    }
+
+    function populateDependencyDropdown() {
+      // Se inicializa en selectTaskToEdit
+    }
+
+    function resetGanttData() {
+      tasks = JSON.parse(JSON.stringify(initialTasksBackup));
+      renderGantt();
+      selectTaskToEdit(selectedTaskId);
+    }
+  </script>
+</body>
+</html>
