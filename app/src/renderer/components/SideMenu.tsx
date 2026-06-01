@@ -28,6 +28,8 @@ interface SideMenuProps {
   onUpdateCategory: (categoryId: number, payload: { name?: string; color?: string }) => Promise<void>
   onExportData: () => void
   onImportData: () => void
+  onHide: () => void
+  onClearFilters: () => void
 }
 
 type IconName =
@@ -178,6 +180,8 @@ function SideMenu({
   onUpdateCategory,
   onExportData,
   onImportData,
+  onHide,
+  onClearFilters,
 }: SideMenuProps) {
   const [contextMenu, setContextMenu] = useState<EntityContextMenuState | null>(null)
   const [nameDraft, setNameDraft] = useState('')
@@ -390,6 +394,18 @@ function SideMenu({
 
   return (
     <aside className="side-menu">
+      <button
+        type="button"
+        className="menu-hide-btn"
+        onClick={onHide}
+        title="Hide side menu"
+        aria-label="Hide side menu"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="menu-icon">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+        Hide menu
+      </button>
       <div className="menu-top">
         <nav aria-label="Main views">
           {viewMenu.map((item) => (
@@ -417,6 +433,15 @@ function SideMenu({
             onChange={(event) => onToggleCompletedTasks(event.target.checked)}
           />
         </label>
+        {(selectedProjectId !== null || selectedTagId !== null || selectedCategoryId !== null) && (
+          <button
+            type="button"
+            className="clear-filters-btn"
+            onClick={onClearFilters}
+          >
+            ✕ Clear filters
+          </button>
+        )}
       </section>
 
       <section className="menu-section">

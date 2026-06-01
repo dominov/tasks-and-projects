@@ -168,15 +168,28 @@
   padding: 0.45rem 0.55rem;
   border-radius: 0.5rem;
   font-size: 13px;
+  line-height: 1.15;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
   white-space: normal;
   overflow: hidden;
   cursor: pointer;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  min-height: 2.9rem;
+  height: 3.35rem;
+  border: 1px solid;
 }
 
 .weekly-multi-day-task strong {
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekly-task-project-label {
+  font-size: 10px;
+  opacity: 0.8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,7 +211,7 @@
 
 .weekly-single-task.weekly-task--priority-low,
 .weekly-multi-day-task.weekly-task--priority-low {
-  background: #ecfeff;
+  background: #fff;
   border-color: #67e8f9;
 }
 
@@ -221,6 +234,12 @@ font-size: 0.63rem;
     opacity: 0.85;
     font-style: italic;
     color: palevioletred;
+}
+
+.weekly-multi-day-task .weekly-task-goal-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .add-task-btn {
@@ -315,6 +334,29 @@ body,
   flex-direction: column;
   gap: 1rem;
   overflow-y: auto;
+}
+
+.menu-hide-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  border: 0;
+  border-radius: 0.4rem;
+  background: rgba(30, 41, 59, 0.5);
+  color: #94a3b8;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.38rem 0.6rem;
+  cursor: pointer;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.menu-hide-btn:hover {
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
 }
 
 .menu-top {
@@ -415,6 +457,26 @@ body,
 
 .completed-toggle input {
   width: auto;
+}
+
+.clear-filters-btn {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 0.4rem;
+  background: rgba(127, 29, 29, 0.35);
+  color: #fca5a5;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.38rem 0.65rem;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+.clear-filters-btn:hover {
+  background: rgba(127, 29, 29, 0.6);
+  color: #fee2e2;
 }
 
 .menu-section h3 {
@@ -2808,6 +2870,12 @@ tbody tr.task-row--new:hover td {
   );
 }
 
+.gantt-day-cell.is-today {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
 .gantt-body {
   position: relative;
   display: flex;
@@ -2929,6 +2997,10 @@ tbody tr.task-row--new:hover td {
     transparent 4px,
     transparent 8px
   );
+}
+
+.gantt-cell.is-today {
+  background: rgba(219, 234, 254, 0.2);
 }
 
 .gantt-bar {

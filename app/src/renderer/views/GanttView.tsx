@@ -238,6 +238,8 @@ function GanttView({
 
   const rows = useMemo<GanttRow[]>(() => groupedRows.flatMap((section) => section.rows), [groupedRows])
 
+  const todayIso = useMemo(() => toIsoDate(new Date()), [])
+
   // Build window: one week before today until the latest task date + 3 days.
   const days = useMemo<DayCell[]>(() => {
     const today = new Date()
@@ -576,6 +578,7 @@ function GanttView({
               sidePanelWidth={sidePanelWidth}
               onBeginResize={beginPanelResize}
               isResizing={Boolean(panelResize)}
+              todayIso={todayIso}
             />
 
             <div className="gantt-body">
@@ -652,7 +655,7 @@ function GanttView({
                           {days.map((cell, idx) => (
                             <div
                               key={cell.iso}
-                              className={`gantt-cell${cell.isWeekend ? ' is-weekend' : ''}`}
+                              className={`gantt-cell${cell.isWeekend ? ' is-weekend' : ''}${cell.iso === todayIso ? ' is-today' : ''}`}
                               style={{
                                 left: cell.offset,
                                 width: cell.width,
@@ -706,9 +709,10 @@ interface GanttHeaderProps {
   sidePanelWidth: number
   onBeginResize: (event: React.PointerEvent<HTMLButtonElement>) => void
   isResizing: boolean
+  todayIso: string
 }
 
-function GanttHeader({ days, sidePanelWidth, onBeginResize, isResizing }: GanttHeaderProps) {
+function GanttHeader({ days, sidePanelWidth, onBeginResize, isResizing, todayIso }: GanttHeaderProps) {
   const monthGroups = useMemo(() => {
     const groups: { key: string; label: string; width: number }[] = []
     for (const cell of days) {
@@ -750,7 +754,7 @@ function GanttHeader({ days, sidePanelWidth, onBeginResize, isResizing }: GanttH
           {days.map((cell) => (
             <div
               key={cell.iso}
-              className={`gantt-day-cell${cell.isWeekend ? ' is-weekend' : ''}`}
+              className={`gantt-day-cell${cell.isWeekend ? ' is-weekend' : ''}${cell.iso === todayIso ? ' is-today' : ''}`}
               style={{ width: cell.width }}
             >
               {cell.date.getDate()}

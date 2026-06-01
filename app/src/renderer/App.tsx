@@ -562,6 +562,8 @@ function App() {
           onUpdateCategory={handleUpdateCategory}
           onExportData={handleExportData}
           onImportData={handleImportData}
+          onHide={() => setIsSideMenuVisible(false)}
+          onClearFilters={() => { setProjectId(null); setTagId(null); setCategoryId(null) }}
         />
       )}
 

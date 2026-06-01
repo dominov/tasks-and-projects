@@ -13,7 +13,7 @@ import { isWorkingDay } from '../utils/dateUtils';
 import type { Project, TaskWithRelations } from '../../common/types';
 import type { QuickCreateOptions } from '../components/ViewManager';
 
-const MULTI_DAY_ROW_HEIGHT_REM = 3.35;
+const MULTI_DAY_ROW_HEIGHT_REM = 3.75;
 
 interface WeeklyCalendarViewProps {
   tasks: TaskWithRelations[];
@@ -318,7 +318,7 @@ export default function WeeklyCalendarView({
                     >
                       {goalSubtitle && <div className="weekly-task-goal-subtitle">{goalSubtitle}</div>}
                         <strong>{task.title}</strong>
-                        <div style={{ fontSize: '10px', opacity: 0.8 }}>
+                        <div className="weekly-task-project-label">
                             {task.project_name || 'No Project'}
                         </div>
                     </div>

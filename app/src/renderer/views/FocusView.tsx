@@ -17,14 +17,6 @@ interface FocusViewProps {
 
 const STATUS_FLOW: TaskStatus[] = ['todo', 'in_progress', 'done']
 
-function getNextBusinessDay(today: Date): string {
-  const day = today.getDay()
-  const daysToAdd = day === 5 ? 3 : day === 6 ? 2 : 1
-  const next = new Date(today)
-  next.setDate(next.getDate() + daysToAdd)
-  return next.toISOString().slice(0, 10)
-}
-
 function formatCurrentDate(): string {
   return new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -80,7 +72,6 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
   const [creatingTask, setCreatingTask] = useState(false)
   const [updatingTaskIds, setUpdatingTaskIds] = useState<Set<number>>(new Set())
   const today = new Date().toISOString().slice(0, 10)
-  const nextBusinessDay = getNextBusinessDay(new Date())
 
   const activeTasks = useMemo(
     () => tasks.filter((t) => t.type !== 'goal'),
@@ -95,11 +86,6 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
   const overdueTasks = useMemo(
     () => activeTasks.filter((t) => t.status !== 'done' && !!t.end_date && t.end_date < today),
     [activeTasks, today],
-  )
-
-  const tomorrowTasks = useMemo(
-    () => activeTasks.filter((t) => t.end_date === nextBusinessDay),
-    [activeTasks, nextBusinessDay],
   )
 
   const todoToday = useMemo(
@@ -398,28 +384,6 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
               </div>
             </section>
           )}
-
-          {/* BOX 3: Next Business Day */}
-          <section className="focus-box focus-box--tomorrow">
-            <h2 className="focus-box__title focus-box__title--tomorrow">Next Business Day</h2>
-            <div className="focus-tomorrow-list">
-              {tomorrowTasks.length === 0 && <EmptyState text="No tasks scheduled" />}
-              {tomorrowTasks.map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  data-details-trigger="open"
-                  className={`focus-tomorrow-item${selectedTaskId === task.id ? ' focus-tomorrow-item--active' : ''}`}
-                  onClick={() => onSelectTask(task.id)}
-                >
-                  <span className="focus-tomorrow-item__title">{task.title}</span>
-                  {task.project_name && (
-                    <span className="focus-tomorrow-item__project">{task.project_name}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </section>
         </div>
       </div>
     </div>
