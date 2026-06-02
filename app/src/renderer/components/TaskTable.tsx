@@ -602,6 +602,7 @@ function renderTaskRow(
     selectedTaskId === task.id ? 'row-selected' : '',
     isSubtask ? 'task-row--subtask' : '',
     isNewlyCreatedTask ? 'task-row--new' : '',
+    task.tracking_only ? 'task-row--tracking' : '',
   ]
     .filter(Boolean)
     .join(' ')

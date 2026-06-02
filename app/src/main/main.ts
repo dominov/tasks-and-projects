@@ -77,6 +77,7 @@ async function ensureDatabaseReady(): Promise<AppDatabase> {
   const database = await openDatabase(dbFilePath)
   applyMigrations(database)
   ensureTaskMetadataColumns(database)
+  ensureTrackingOnlyColumn(database)
   ensureCategoryMetadataColumns(database)
   return database
 }
@@ -119,6 +120,7 @@ function registerIpcHandlers(database: AppDatabase): void {
         t.start_time,
         t.end_time,
         t.type,
+        t.tracking_only,
         p.name AS project_name,
         c.name AS category_name,
         GROUP_CONCAT(DISTINCT tt.tag_id) AS tag_ids,
@@ -215,6 +217,11 @@ function registerIpcHandlers(database: AppDatabase): void {
       }
 
       setClauses.push(`type = '${payload.type}'`)
+    }
+
+    if (payload.tracking_only !== undefined) {
+      const trackingOnly = payload.tracking_only ? 1 : 0
+      setClauses.push(`tracking_only = ${trackingOnly}`)
     }
 
     if (payload.priority !== undefined) {
@@ -1001,6 +1008,15 @@ function ensureTaskMetadataColumns(database: AppDatabase): void {
   database.execute("UPDATE tasks SET created_at = datetime('now') WHERE created_at IS NULL;")
   database.execute("UPDATE tasks SET type = 'task' WHERE type IS NULL OR type NOT IN ('task', 'goal');")
   database.execute("UPDATE tasks SET recurrence = 'none' WHERE recurrence IS NULL OR recurrence NOT IN ('none', 'weekly', 'monthly');")
+}
+
+function ensureTrackingOnlyColumn(database: AppDatabase): void {
+  const columns = database.query<{ name: string }>('PRAGMA table_info(tasks);')
+  const hasTrackingOnly = columns.some((column) => column.name === 'tracking_only')
+
+  if (!hasTrackingOnly) {
+    database.execute('ALTER TABLE tasks ADD COLUMN tracking_only INTEGER NOT NULL DEFAULT 0;')
+  }
 }
 
 function ensureCategoryMetadataColumns(database: AppDatabase): void {

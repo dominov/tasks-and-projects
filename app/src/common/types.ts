@@ -42,6 +42,7 @@ export interface Task {
   start_time: string | null
   end_time: string | null
   type: TaskType
+  tracking_only: number
 }
 
 export interface TaskWithRelations extends Task {
@@ -67,6 +68,7 @@ export interface TaskUpdatePayload {
   recurrence?: Recurrence
   recurrence_rule?: string | null
   previous_recurrent_id?: number | null
+  tracking_only?: number
 }
 
 export interface TaskCreatePayload {

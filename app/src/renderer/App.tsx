@@ -17,6 +17,7 @@ function App() {
   const [tagId, setTagId] = useState<number | null>(null)
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [showCompletedTasks, setShowCompletedTasks] = useState(false)
+  const [showTrackingTasks, setShowTrackingTasks] = useState(true)
   const [presentationMode, setPresentationMode] = useState(false)
   const [isDataOperationLoading, setIsDataOperationLoading] = useState(false)
   const { banner, showBanner, dismissBanner } = useBanner()
@@ -43,12 +44,18 @@ function App() {
   )
 
   const displayedTasks = useMemo(() => {
-    if (showCompletedTasks || viewType === 'focus') {
-      return filteredTasks
+    let result = filteredTasks
+
+    if (!showCompletedTasks && viewType !== 'focus') {
+      result = result.filter((task) => task.status !== 'done')
     }
 
-    return filteredTasks.filter((task) => task.status !== 'done')
-  }, [filteredTasks, showCompletedTasks, viewType])
+    if (!showTrackingTasks) {
+      result = result.filter((task) => !task.tracking_only)
+    }
+
+    return result
+  }, [filteredTasks, showCompletedTasks, showTrackingTasks, viewType])
 
   useEffect(() => {
     if (error) {
@@ -542,12 +549,14 @@ function App() {
           tags={tags}
           categories={categories}
           showCompletedTasks={showCompletedTasks}
+          showTrackingTasks={showTrackingTasks}
           selectedProjectId={projectId}
           selectedTagId={tagId}
           selectedCategoryId={categoryId}
           isDataOperationLoading={isDataOperationLoading}
           onChangeView={setViewType}
           onToggleCompletedTasks={setShowCompletedTasks}
+          onToggleTrackingTasks={setShowTrackingTasks}
           onSelectProject={setProjectId}
           onSelectTag={setTagId}
           onSelectCategory={setCategoryId}

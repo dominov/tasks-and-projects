@@ -306,7 +306,7 @@ export default function WeeklyCalendarView({
                 return (
                     <div 
                         key={task.id} 
-                        className={`weekly-multi-day-task weekly-task--priority-${priorityTone}`}
+                        className={`weekly-multi-day-task weekly-task--priority-${priorityTone}${task.tracking_only ? ' weekly-multi-day-task--tracking' : ''}`}
                         data-details-trigger="open"
                         style={{ 
                             left, 
@@ -348,7 +348,7 @@ export default function WeeklyCalendarView({
                     return (
                       <div
                         key={task.id}
-                        className={`weekly-single-task weekly-task--priority-${priorityTone}`}
+                        className={`weekly-single-task weekly-task--priority-${priorityTone}${task.tracking_only ? ' weekly-single-task--tracking' : ''}`}
                         data-details-trigger="open"
                         onClick={() => onSelectTask(task.id)}
                         style={{

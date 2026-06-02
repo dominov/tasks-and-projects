@@ -74,7 +74,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
   const today = new Date().toISOString().slice(0, 10)
 
   const activeTasks = useMemo(
-    () => tasks.filter((t) => t.type !== 'goal'),
+    () => tasks.filter((t) => t.type !== 'goal' && !t.tracking_only),
     [tasks],
   )
 

@@ -25,6 +25,7 @@ interface TaskDraft {
   tagIds: number[]
   recurrence: Recurrence
   recurrenceRule: string | null
+  trackingOnly: boolean
 }
 
 interface RecurrenceDialogDraft {
@@ -63,6 +64,7 @@ function createEmptyDraft(): TaskDraft {
     tagIds: [],
     recurrence: 'none',
     recurrenceRule: null,
+    trackingOnly: false,
   }
 }
 
@@ -175,6 +177,7 @@ function TaskDetailsSidebar({
       tagIds: parseTagIds(selectedTask.tag_ids),
       recurrence: selectedTask.recurrence,
       recurrenceRule: selectedTask.recurrence_rule,
+      trackingOnly: Boolean(selectedTask.tracking_only),
     })
     setTagInput(getTagNamesFromIds(parseTagIds(selectedTask.tag_ids), tags))
     setSubtaskTitle('')
@@ -623,6 +626,20 @@ function TaskDetailsSidebar({
                 <option value="task">Task</option>
                 <option value="goal">Goal</option>
               </select>
+            </div>
+
+            <div className="detail-field detail-field--inline">
+              <label className="detail-label" htmlFor="detail-tracking-only">Tracking only:</label>
+              <input
+                id="detail-tracking-only"
+                type="checkbox"
+                checked={draft.trackingOnly}
+                onChange={(event) => {
+                  const nextValue = event.target.checked
+                  setDraft((current) => ({ ...current, trackingOnly: nextValue }))
+                  void persistUpdate({ tracking_only: nextValue ? 1 : 0 }, 'Tracking status updated.')
+                }}
+              />
             </div>
 
             <section className="priority-section">

@@ -1413,6 +1413,22 @@ tbody tr.task-row--new:hover td {
   background: #dbeafe;
 }
 
+/* ─── Tracking Only Tasks ───────────────────────────────────────── */
+
+.task-row--tracking td {
+  opacity: 0.55;
+}
+
+.task-row--tracking .status-dot {
+  background: #94a3b8;
+  border-color: #64748b;
+}
+
+.weekly-single-task--tracking,
+.weekly-multi-day-task--tracking {
+  opacity: 0.5;
+}
+
 .status-dot.status-dot--new-task {
   background: #3b82f6;
   border-color: #1d4ed8;

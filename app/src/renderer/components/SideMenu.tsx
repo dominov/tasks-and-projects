@@ -8,12 +8,14 @@ interface SideMenuProps {
   tags: Tag[]
   categories: Category[]
   showCompletedTasks: boolean
+  showTrackingTasks: boolean
   selectedProjectId: number | null
   selectedTagId: number | null
   selectedCategoryId: number | null
   isDataOperationLoading: boolean
   onChangeView: (view: ViewType) => void
   onToggleCompletedTasks: (showCompleted: boolean) => void
+  onToggleTrackingTasks: (showTracking: boolean) => void
   onSelectProject: (projectId: number | null) => void
   onSelectTag: (tagId: number | null) => void
   onSelectCategory: (categoryId: number | null) => void
@@ -160,12 +162,14 @@ function SideMenu({
   categories,
   tags,
   showCompletedTasks,
+  showTrackingTasks,
   selectedProjectId,
   selectedTagId,
   selectedCategoryId,
   isDataOperationLoading,
   onChangeView,
   onToggleCompletedTasks,
+  onToggleTrackingTasks,
   onSelectProject,
   onSelectTag,
   onSelectCategory,
@@ -431,6 +435,14 @@ function SideMenu({
             type="checkbox"
             checked={showCompletedTasks}
             onChange={(event) => onToggleCompletedTasks(event.target.checked)}
+          />
+        </label>
+        <label className="completed-toggle">
+          <span>Show tracking tasks</span>
+          <input
+            type="checkbox"
+            checked={showTrackingTasks}
+            onChange={(event) => onToggleTrackingTasks(event.target.checked)}
           />
         </label>
         {(selectedProjectId !== null || selectedTagId !== null || selectedCategoryId !== null) && (
