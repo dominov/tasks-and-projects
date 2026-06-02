@@ -610,6 +610,7 @@ function GanttView({
                     const adjustedWidth =
                       isDragging && dragState?.mode === 'resize' ? Math.max(MIN_WEEKDAY_WIDTH, width + liveDeltaPx) : width
                     const isGoal = task.type === 'goal'
+                    const isSubtask = row.level > 0
                     const isExpanded = expandedRows[task.id] ?? true
 
                     const handleBarClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -668,7 +669,7 @@ function GanttView({
                           <div
                             className={`gantt-bar${isDragging ? ' is-dragging' : ''}${
                               selectedTaskId === task.id ? ' is-selected' : ''
-                            }${isGoal ? ' is-goal' : ''}`}
+                            }${isGoal ? ' is-goal' : ''}${isSubtask ? ' is-subtask' : ''}`}
                             style={{
                               left: adjustedLeft,
                               width: adjustedWidth,

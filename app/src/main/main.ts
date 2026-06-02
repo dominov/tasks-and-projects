@@ -387,12 +387,6 @@ function registerIpcHandlers(database: AppDatabase): void {
       recalculateGoalBounds(database, previousParentTaskId)
     }
 
-    const updatedTask = database.first<{ type: TaskType }>(`SELECT type FROM tasks WHERE id = ${taskId}`)
-
-    if (updatedTask?.type === 'goal') {
-      recalculateGoalBounds(database, taskId)
-    }
-
     // Cascade dependency shift when this task's end_date moved.
     let conflicts: DependencyCascadeConflict[] = []
 
@@ -1286,11 +1280,13 @@ function recalculateGoalBounds(database: AppDatabase, taskId: number): void {
   }
 
   const bounds = database.first<{
+    subtask_count: number
     min_start_date: string | null
     fallback_start_date: string | null
     max_end_date: string | null
   }>(`
     SELECT
+      COUNT(*) AS subtask_count,
       MIN(start_date) AS min_start_date,
       MIN(end_date) AS fallback_start_date,
       MAX(end_date) AS max_end_date
@@ -1298,13 +1294,23 @@ function recalculateGoalBounds(database: AppDatabase, taskId: number): void {
     WHERE parent_task_id = ${taskId};
   `)
 
-  const nextGoalStartDate = bounds?.min_start_date ?? bounds?.fallback_start_date ?? null
+  if (!bounds || bounds.subtask_count === 0) {
+    return
+  }
+
+  const hasAnySubtaskDate = Boolean(bounds.min_start_date || bounds.fallback_start_date || bounds.max_end_date)
+
+  if (!hasAnySubtaskDate) {
+    return
+  }
+
+  const nextGoalStartDate = bounds.min_start_date ?? bounds.fallback_start_date ?? null
 
   database.execute(`
     UPDATE tasks
     SET
       start_date = ${nextGoalStartDate ? `'${escapeSqlString(nextGoalStartDate)}'` : 'NULL'},
-      end_date = ${bounds?.max_end_date ? `'${escapeSqlString(bounds.max_end_date)}'` : 'NULL'}
+      end_date = ${bounds.max_end_date ? `'${escapeSqlString(bounds.max_end_date)}'` : 'NULL'}
     WHERE id = ${taskId};
   `)
 }

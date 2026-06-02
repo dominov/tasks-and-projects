@@ -670,7 +670,6 @@ function TaskDetailsSidebar({
                   id="detail-start-date"
                   type="date"
                   value={draft.startDate}
-                  disabled={draft.type === 'goal'}
                   max={draft.endDate || undefined}
                   onClick={openDatePickerFromEvent}
                   onFocus={openDatePickerFromEvent}
@@ -687,7 +686,6 @@ function TaskDetailsSidebar({
                   id="detail-due-date"
                   type="date"
                   value={draft.endDate}
-                  disabled={draft.type === 'goal'}
                   min={draft.startDate || undefined}
                   onClick={openDatePickerFromEvent}
                   onFocus={openDatePickerFromEvent}
@@ -700,7 +698,7 @@ function TaskDetailsSidebar({
               </div>
             </div>
 
-            {draft.type === 'goal' && (
+            {draft.type === 'goal' && subtasks.length > 0 && (
               <p className="muted">Goal dates are calculated automatically from its subtasks.</p>
             )}
 

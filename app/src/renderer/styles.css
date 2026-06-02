@@ -176,7 +176,7 @@
   overflow: hidden;
   cursor: pointer;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  height: 3.35rem;
+  
   border: 1px solid;
 }
 
@@ -1619,6 +1619,7 @@ tbody tr.task-row--new:hover td {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .detail-separator {
@@ -2059,6 +2060,7 @@ tbody tr.task-row--new:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
+  min-width: 0;
   border: 1px solid #1e293b;
   border-radius: 0.45rem;
   background: #020617;
@@ -2078,6 +2080,8 @@ tbody tr.task-row--new:hover td {
 }
 
 .subtask-item__title {
+  flex: 1;
+  min-width: 0;
   color: #e2e8f0;
   font-size: 0.78rem;
   font-weight: 600;
@@ -3029,8 +3033,13 @@ tbody tr.task-row--new:hover td {
 }
 
 .gantt-bar.is-goal {
-  opacity: 0.9;
+  border-radius: 0;
+  opacity: 0.92;
   cursor: grab;
+}
+
+.gantt-bar.is-subtask {
+  border-radius: 11px;
 }
 
 .gantt-bar-label {
@@ -3049,6 +3058,10 @@ tbody tr.task-row--new:hover td {
   margin-right: -0.6rem;
   margin-left: 0.4rem;
   touch-action: none;
+}
+
+.gantt-bar.is-subtask .gantt-bar-handle {
+  border-radius: 0 11px 11px 0;
 }
 
 .gantt-milestone-row {
