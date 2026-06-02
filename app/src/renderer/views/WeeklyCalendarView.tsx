@@ -13,7 +13,7 @@ import { isWorkingDay } from '../utils/dateUtils';
 import type { Project, TaskWithRelations } from '../../common/types';
 import type { QuickCreateOptions } from '../components/ViewManager';
 
-const MULTI_DAY_ROW_HEIGHT_REM = 3.75;
+const MULTI_DAY_ROW_HEIGHT_REM = 4.25;
 
 interface WeeklyCalendarViewProps {
   tasks: TaskWithRelations[];
