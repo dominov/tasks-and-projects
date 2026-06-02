@@ -3038,6 +3038,11 @@ tbody tr.task-row--new:hover td {
   cursor: grab;
 }
 
+.gantt-bar.is-empty-goal {
+  opacity: 0.7;
+  border: 1px dotted rgba(248, 250, 252, 0.9);
+}
+
 .gantt-bar.is-subtask {
   border-radius: 11px;
 }
