@@ -222,62 +222,6 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
         <section className="focus-box focus-box--today">
           <h2 className="focus-box__title">Priorities for Today</h2>
           <div className="focus-kanban">
-            {/* To Do */}
-            <div className="focus-kanban__col">
-              <div className="focus-kanban__col-header">
-                <CircleIcon />
-                <span>TO DO</span>
-              </div>
-              <div className="focus-kanban__col-body">
-                {todoToday.length === 0 && <EmptyState text="All clear" />}
-                {todoToday.map((task) => (
-                  <FocusCard
-                    key={task.id}
-                    task={task}
-                    selected={selectedTaskId === task.id}
-                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
-                    onSelect={onSelectTask}
-                    onMoveStatus={handleMoveTaskStatus}
-                    statusUpdating={updatingTaskIds.has(task.id)}
-                  />
-                ))}
-                <div className="focus-add-task-wrap">
-                  {addingStatus === 'todo' ? (
-                    <input
-                      type="text"
-                      autoFocus
-                      className="add-task-input"
-                      value={newTaskTitle}
-                      onChange={(event) => setNewTaskTitle(event.target.value)}
-                      onBlur={() => {
-                        if (!creatingTask) {
-                          setAddingStatus(null)
-                        }
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          void handleCreateFocusTask('todo')
-                        }
-
-                        if (event.key === 'Escape') {
-                          setAddingStatus(null)
-                        }
-                      }}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className="add-task-btn"
-                      onClick={() => openAddTask('todo')}
-                    >
-                      + Add task
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="focus-kanban__col-count">{todoToday.length}</div>
-            </div>
-
             {/* In Progress */}
             <div className="focus-kanban__col">
               <div className="focus-kanban__col-header focus-kanban__col-header--progress">
@@ -333,6 +277,62 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                 </div>
               </div>
               <div className="focus-kanban__col-count">{inProgressToday.length}</div>
+            </div>
+
+            {/* To Do */}
+            <div className="focus-kanban__col">
+              <div className="focus-kanban__col-header">
+                <CircleIcon />
+                <span>TO DO</span>
+              </div>
+              <div className="focus-kanban__col-body">
+                {todoToday.length === 0 && <EmptyState text="All clear" />}
+                {todoToday.map((task) => (
+                  <FocusCard
+                    key={task.id}
+                    task={task}
+                    selected={selectedTaskId === task.id}
+                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                    onSelect={onSelectTask}
+                    onMoveStatus={handleMoveTaskStatus}
+                    statusUpdating={updatingTaskIds.has(task.id)}
+                  />
+                ))}
+                <div className="focus-add-task-wrap">
+                  {addingStatus === 'todo' ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      className="add-task-input"
+                      value={newTaskTitle}
+                      onChange={(event) => setNewTaskTitle(event.target.value)}
+                      onBlur={() => {
+                        if (!creatingTask) {
+                          setAddingStatus(null)
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void handleCreateFocusTask('todo')
+                        }
+
+                        if (event.key === 'Escape') {
+                          setAddingStatus(null)
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="add-task-btn"
+                      onClick={() => openAddTask('todo')}
+                    >
+                      + Add task
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="focus-kanban__col-count">{todoToday.length}</div>
             </div>
 
             {/* Done */}

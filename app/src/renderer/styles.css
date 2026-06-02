@@ -2266,7 +2266,7 @@ tbody tr.task-row--new:hover td {
 
 .focus-kanban {
   display: grid;
-  grid-template-columns: minmax(0, 35fr) minmax(0, 40fr) minmax(0, 25fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 
@@ -2301,13 +2301,15 @@ tbody tr.task-row--new:hover td {
 }
 
 .focus-kanban__col-body {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-content: start;
   gap: 0.5rem;
   flex: 1;
 }
 
 .focus-add-task-wrap {
+  grid-column: 1 / -1;
   margin-top: auto;
   padding-top: 0.5rem;
 }
@@ -2396,7 +2398,7 @@ tbody tr.task-row--new:hover td {
 }
 
 .focus-card.weekly-task--priority-low {
-  background: #ecfeff;
+  
   border-color: #67e8f9;
 }
 
@@ -2623,6 +2625,7 @@ tbody tr.task-row--new:hover td {
 }
 
 .focus-empty {
+  grid-column: 1 / -1;
   font-size: 0.82rem;
   color: #94a3b8;
   font-style: italic;
