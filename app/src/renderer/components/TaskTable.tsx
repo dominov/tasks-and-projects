@@ -67,7 +67,7 @@ function TaskTable({
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [creatingTask, setCreatingTask] = useState(false)
   const [quickDueDate, setQuickDueDate] = useState('')
-  const [quickPriority, setQuickPriority] = useState<'' | '1' | '2' | '3'>('')
+  const [quickPriority, setQuickPriority] = useState<'1' | '2' | '3'>('1')
   const [quickProjectId, setQuickProjectId] = useState('')
   const [goalSubtaskTitles, setGoalSubtaskTitles] = useState<Record<number, string>>({})
   const [creatingGoalSubtaskId, setCreatingGoalSubtaskId] = useState<number | null>(null)
@@ -155,7 +155,7 @@ function TaskTable({
     try {
       const createdTaskId = await onCreateTask(newTaskTitle.trim(), createType, {
         endDate: isGoalView ? undefined : quickDueDate || null,
-        priority: isGoalView ? undefined : quickPriority ? (Number(quickPriority) as 1 | 2 | 3) : undefined,
+        priority: isGoalView ? undefined : (Number(quickPriority) as 1 | 2 | 3),
         projectId:
           quickProjectId === ''
             ? projectId
@@ -166,7 +166,7 @@ function TaskTable({
 
       setNewTaskTitle('')
       setQuickDueDate('')
-      setQuickPriority('')
+      setQuickPriority('1')
       setQuickProjectId('')
     } finally {
       setCreatingTask(false)
@@ -361,10 +361,9 @@ function TaskTable({
             <select
               className="quick-add-select"
               value={quickPriority}
-              onChange={(event) => setQuickPriority(event.target.value as '' | '1' | '2' | '3')}
+              onChange={(event) => setQuickPriority(event.target.value as '1' | '2' | '3')}
               disabled={creatingTask}
             >
-              <option value="">Priority...</option>
               <option value="1">Low</option>
               <option value="2">Medium</option>
               <option value="3">High</option>

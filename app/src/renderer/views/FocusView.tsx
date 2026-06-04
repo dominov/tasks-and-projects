@@ -4,6 +4,7 @@ import type { Project, TaskStatus, TaskUpdatePayload, TaskWithRelations } from '
 import type { QuickCreateOptions } from '../components/ViewManager'
 
 type SortBy = 'priority' | 'project' | 'story_points'
+type TaskParentRelation = 'GOAL' | 'PARENT TASK' | 'NONE'
 
 interface FocusViewProps {
   tasks: TaskWithRelations[]
@@ -116,6 +117,28 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
     return map
   }, [projects])
 
+  const taskById = useMemo(() => {
+    const map = new Map<number, TaskWithRelations>()
+    for (const task of tasks) {
+      map.set(task.id, task)
+    }
+    return map
+  }, [tasks])
+
+  const taskRelationMap = useMemo(() => {
+    const map = new Map<number, TaskParentRelation>()
+    for (const task of activeTasks) {
+      if (!task.parent_task_id) {
+        map.set(task.id, 'NONE')
+        continue
+      }
+
+      const parentTask = taskById.get(task.parent_task_id)
+      map.set(task.id, parentTask?.type === 'goal' ? 'GOAL' : 'PARENT TASK')
+    }
+    return map
+  }, [activeTasks, taskById])
+
   async function handleCreateFocusTask(status: 'todo' | 'in_progress'): Promise<void> {
     if (!newTaskTitle.trim()) {
       setAddingStatus(null)
@@ -218,8 +241,9 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
 
       {/* Scrollable content */}
       <div className="focus-scroll">
-        {/* BOX 1: Today's Priorities */}
-        <section className="focus-box focus-box--today">
+        <div className={sortedOverdue.length > 0 ? 'focus-primary-grid' : 'focus-primary-grid focus-primary-grid--single'}>
+          {/* BOX 1: Today's Priorities */}
+          <section className="focus-box focus-box--today">
           <h2 className="focus-box__title">Priorities for Today</h2>
           <div className="focus-kanban">
             {/* In Progress */}
@@ -228,7 +252,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                 <ProgressIcon />
                 <span>IN PROGRESS</span>
               </div>
-              <div className="focus-kanban__col-body">
+              <div className="focus-kanban__col-body focus-kanban__col-body--progress">
                 {inProgressToday.length === 0 && <EmptyState text="Nothing running" />}
                 {inProgressToday.map((task) => (
                   <FocusCard
@@ -240,6 +264,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     showPulse
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
+                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
                   />
                 ))}
                 <div className="focus-add-task-wrap">
@@ -296,6 +321,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     onSelect={onSelectTask}
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
+                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
                   />
                 ))}
                 <div className="focus-add-task-wrap">
@@ -352,15 +378,15 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     onSelect={onSelectTask}
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
+                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
                   />
                 ))}
               </div>
               <div className="focus-kanban__col-count">{doneToday.length}</div>
             </div>
           </div>
-        </section>
+          </section>
 
-        <div className="focus-secondary-grid">
           {/* BOX 2: Overdue */}
           {sortedOverdue.length > 0 && (
             <section className="focus-box focus-box--overdue">
@@ -379,6 +405,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     overdue
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
+                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
                   />
                 ))}
               </div>
@@ -396,6 +423,7 @@ interface FocusCardProps {
   task: TaskWithRelations
   selected: boolean
   projectColor?: string
+  relation: TaskParentRelation
   onSelect: (taskId: number) => void
   onMoveStatus: (task: TaskWithRelations, direction: 'prev' | 'next') => Promise<void>
   statusUpdating: boolean
@@ -415,7 +443,7 @@ function getPriorityTone(priority: number): 'low' | 'medium' | 'high' {
   return 'medium'
 }
 
-function FocusCard({ task, selected, projectColor, onSelect, onMoveStatus, statusUpdating, overdue, showPulse }: FocusCardProps) {
+function FocusCard({ task, selected, projectColor, relation, onSelect, onMoveStatus, statusUpdating, overdue, showPulse }: FocusCardProps) {
   const tags = task.tag_names ? task.tag_names.split(',').map((t) => t.trim()) : []
   const categoryIcon = getCategoryIcon(task.category_name)
   const canMovePrev = task.status !== 'todo'
@@ -489,6 +517,16 @@ function FocusCard({ task, selected, projectColor, onSelect, onMoveStatus, statu
 
       {/* Footer: attributes */}
       <div className="focus-card__footer">
+        <span className="focus-card__relation-field">
+          <span className="focus-card__relation-label">Part of:</span>
+          <span className={[
+            'focus-card__relation-value',
+            relation === 'GOAL' && 'focus-card__relation-value--goal',
+            relation === 'PARENT TASK' && 'focus-card__relation-value--parent',
+          ].filter(Boolean).join(' ')}>
+            {relation}
+          </span>
+        </span>
         {task.project_name && (
           <span
             className="focus-card__project"

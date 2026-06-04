@@ -241,17 +241,12 @@ function App() {
           type,
           start_date: options?.startDate ?? null,
           end_date: options?.endDate ?? null,
+          priority: options?.priority,
           project_id: projectValue,
           category_id: categoryId,
           tag_ids: tagId ? [tagId] : undefined,
         })
         const createdTaskId = Number(createResult.taskId)
-
-        if (options?.priority) {
-          if (Number.isInteger(createdTaskId) && createdTaskId > 0) {
-            await window.taskAppApi.updateTask(createdTaskId, { priority: options.priority })
-          }
-        }
 
         if (options?.status && Number.isInteger(createdTaskId) && createdTaskId > 0) {
           await window.taskAppApi.updateTask(createdTaskId, { status: options.status })

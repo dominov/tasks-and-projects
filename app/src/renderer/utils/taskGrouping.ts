@@ -73,6 +73,13 @@ export function groupTasks(tasks: TaskNode[], groupBy: GroupBy): TaskGroupSectio
       return leftIsFallback ? 1 : -1
     }
 
+    if (groupBy === 'priority') {
+      const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+      const leftOrder = priorityOrder[left.groupLabel] ?? 99
+      const rightOrder = priorityOrder[right.groupLabel] ?? 99
+      return leftOrder - rightOrder
+    }
+
     return left.groupLabel.localeCompare(right.groupLabel)
   })
 }

@@ -499,6 +499,12 @@ function registerIpcHandlers(database: AppDatabase): void {
 
     let categoryId: number | null = payload.category_id ?? null
 
+    let priority = payload.priority ?? 2
+
+    if (![1, 2, 3].includes(priority)) {
+      throw new Error('Invalid priority value')
+    }
+
     if (categoryId !== null) {
       const catId = Number(categoryId)
 
@@ -541,7 +547,7 @@ function registerIpcHandlers(database: AppDatabase): void {
         datetime('now'),
         ${payload.start_date === undefined || payload.start_date === null ? 'NULL' : `'${escapeSqlString(payload.start_date)}'`},
         ${payload.end_date === undefined || payload.end_date === null ? 'NULL' : `'${escapeSqlString(payload.end_date)}'`},
-        2,
+        ${priority},
         1,
         ${projectId === null ? 'NULL' : projectId},
         ${categoryId === null ? 'NULL' : categoryId},

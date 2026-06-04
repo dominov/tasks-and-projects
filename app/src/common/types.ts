@@ -75,6 +75,7 @@ export interface TaskCreatePayload {
   title: string
   start_date?: string | null
   end_date?: string | null
+  priority?: Priority
   type?: TaskType
   parent_task_id?: number | null
   project_id?: number | null

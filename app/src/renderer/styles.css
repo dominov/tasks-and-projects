@@ -2139,6 +2139,7 @@ tbody tr.task-row--new:hover td {
   background: #f8fafc;
   border-radius: 1rem;
   overflow: hidden;
+  max-width: 1080px;
 }
 
 .focus-header {
@@ -2232,24 +2233,28 @@ tbody tr.task-row--new:hover td {
 
 /* ─── Focus Boxes ───────────────────────────────────────────────── */
 
-.focus-box {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 1rem;
-  padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-}
-
-.focus-secondary-grid {
+.focus-primary-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
   gap: 1.25rem;
+  align-items: start;
 }
 
 @media (max-width: 1100px) {
-  .focus-secondary-grid {
+  .focus-primary-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.focus-primary-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.focus-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #ffffff;
+  padding: 1rem;
 }
 
 .focus-box--overdue {
@@ -2293,6 +2298,11 @@ tbody tr.task-row--new:hover td {
   flex-direction: column;
   gap: 0.6rem;
   min-height: 120px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .focus-kanban__col-header {
@@ -2324,6 +2334,27 @@ tbody tr.task-row--new:hover td {
   align-content: start;
   gap: 0.5rem;
   flex: 1;
+}
+
+.focus-kanban__col-body--progress {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.focus-kanban__col-body--progress .add-task-input {
+  min-height: 2.5rem;
+  font-size: 0.82rem;
+}
+
+.focus-kanban__col-body--progress .focus-card__title {
+  font-size: 1.26rem;
+}
+
+.focus-kanban__col-body--progress .focus-card__project,
+.focus-kanban__col-body--progress .focus-card__category,
+.focus-kanban__col-body--progress .focus-card__tag,
+.focus-kanban__col-body--progress .focus-card__relation-label,
+.focus-kanban__col-body--progress .focus-card__relation-value {
+  font-size: 0.78rem;
 }
 
 .focus-add-task-wrap {
@@ -2476,7 +2507,7 @@ tbody tr.task-row--new:hover td {
 }
 
 .focus-card__title {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #0f172a;
   line-height: 1.3;
@@ -2505,7 +2536,7 @@ tbody tr.task-row--new:hover td {
 
 .focus-card__sp {
   flex-shrink: 0;
-  font-size: 0.7rem;
+  font-size: 0.74rem;
   font-weight: 700;
   color: #334155;
   background: #f1f5f9;
@@ -2532,15 +2563,45 @@ tbody tr.task-row--new:hover td {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
   padding-top: 0.3rem;
   border-top: 1px solid #f1f5f9;
+}
+
+.focus-card__relation-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.42rem;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+}
+
+.focus-card__relation-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.focus-card__relation-value {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.focus-card__relation-value--goal {
+  color: #7c2d12;
+}
+
+.focus-card__relation-value--parent {
+  color: #065f46;
 }
 
 .focus-card__project {
   display: inline-flex;
   align-items: center;
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   font-weight: 700;
   border-radius: 0.3rem;
   padding: 0.12rem 0.4rem;
@@ -2552,14 +2613,14 @@ tbody tr.task-row--new:hover td {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   color: #64748b;
   font-weight: 500;
 }
 
 .focus-card__tag {
   display: inline-flex;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
   border-radius: 0.3rem;
   padding: 0.1rem 0.35rem;
