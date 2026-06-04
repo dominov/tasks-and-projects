@@ -327,6 +327,14 @@ body,
   grid-template-columns: 0 minmax(0, 1fr) 380px;
 }
 
+.trip-layout.side-menu-hidden .main-canvas {
+  grid-column: 2 / 3;
+}
+
+.trip-layout.side-menu-hidden .details-sidebar {
+  grid-column: 3 / 4;
+}
+
 .side-menu {
   background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
   color: #e2e8f0;
@@ -2259,7 +2267,6 @@ tbody tr.task-row--new:hover td {
 
 .focus-box--overdue {
   border-left: 4px solid #ef4444;
-  background: #fef2f2;
 }
 
 .focus-box--tomorrow {
