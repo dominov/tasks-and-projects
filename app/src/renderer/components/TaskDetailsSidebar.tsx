@@ -6,7 +6,6 @@ import type {
   Tag,
   TaskCreatePayload,
   TaskStatus,
-  TaskType,
   TaskUpdatePayload,
   TaskWithRelations,
 } from '../../common/types'
@@ -15,7 +14,6 @@ interface TaskDraft {
   title: string
   description: string
   status: TaskStatus
-  type: TaskType
   priority: number
   storyPoints: number
   startDate: string
@@ -54,7 +52,6 @@ function createEmptyDraft(): TaskDraft {
     title: '',
     description: '',
     status: 'todo',
-    type: 'task',
     priority: 1,
     storyPoints: 1,
     startDate: '',
@@ -167,7 +164,6 @@ function TaskDetailsSidebar({
       title: selectedTask.title,
       description: selectedTask.description ?? '',
       status: selectedTask.status,
-      type: selectedTask.type,
       priority: selectedTask.priority,
       storyPoints: selectedTask.story_points,
       startDate: selectedTask.start_date ?? '',
@@ -276,14 +272,6 @@ function TaskDetailsSidebar({
     }
 
     void persistUpdate({ priority: value as 1 | 2 | 3 }, 'Priority updated.')
-  }
-
-  function maybeCommitType(value: TaskType): void {
-    if (!selectedTask || selectedTask.type === value) {
-      return
-    }
-
-    void persistUpdate({ type: value }, 'Task type updated.')
   }
 
   function maybeCommitStartDate(value: string): void {
@@ -613,22 +601,6 @@ function TaskDetailsSidebar({
             </div>
 
             <div className="detail-field detail-field--inline">
-              <label className="detail-label" htmlFor="detail-type">Type:</label>
-              <select
-                id="detail-type"
-                value={draft.type}
-                onChange={(event) => {
-                  const nextType = event.target.value as TaskType
-                  setDraft((current) => ({ ...current, type: nextType }))
-                  maybeCommitType(nextType)
-                }}
-              >
-                <option value="task">Task</option>
-                <option value="goal">Goal</option>
-              </select>
-            </div>
-
-            <div className="detail-field detail-field--inline">
               <label className="detail-label" htmlFor="detail-tracking-only">Tracking only:</label>
               <input
                 id="detail-tracking-only"
@@ -715,7 +687,7 @@ function TaskDetailsSidebar({
               </div>
             </div>
 
-            {draft.type === 'goal' && subtasks.length > 0 && (
+            {selectedTask.type === 'goal' && subtasks.length > 0 && (
               <p className="muted">Goal dates are calculated automatically from its subtasks.</p>
             )}
 

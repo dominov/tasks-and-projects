@@ -28,6 +28,7 @@ interface ViewManagerProps {
   viewType: ViewType
   tasks: TaskWithRelations[]
   lastCreatedTaskId: number | null
+  showCompletedTasks: boolean
   projects: Project[]
   categories: Category[]
   tags: Tag[]
@@ -58,6 +59,7 @@ function ViewManager({
   viewType,
   tasks,
   lastCreatedTaskId,
+  showCompletedTasks,
   projects,
   categories,
   tags,
@@ -128,6 +130,7 @@ function ViewManager({
     return (
       <FocusView
         tasks={tasks}
+        showCompletedTasks={showCompletedTasks}
         projects={projects}
         onSelectTask={onSelectTask}
         selectedTaskId={selectedTaskId}

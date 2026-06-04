@@ -227,10 +227,14 @@ function TaskTable({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [contextMenu])
 
+  function openTaskMenu(task: TaskWithRelations, x: number, y: number): void {
+    setContextMenu({ x, y, task })
+    setConvertSubmenuOpen(false)
+  }
+
   function handleContextMenu(event: globalThis.MouseEvent, task: TaskWithRelations): void {
     event.preventDefault()
-    setContextMenu({ x: event.clientX, y: event.clientY, task })
-    setConvertSubmenuOpen(false)
+    openTaskMenu(task, event.clientX, event.clientY)
   }
 
   const handleContextStatusChange = useCallback(
@@ -276,6 +280,16 @@ function TaskTable({
   const handleContextConvertToTask = useCallback(() => {
     if (!contextMenu) return
     void onUpdateTask(contextMenu.task.id, { parent_task_id: null }, 'Converted to independent task.')
+    setContextMenu(null)
+  }, [contextMenu, onUpdateTask])
+
+  const handleContextConvertTaskType = useCallback(() => {
+    if (!contextMenu) return
+
+    const nextType = contextMenu.task.type === 'task' ? 'goal' : 'task'
+    const successMessage = nextType === 'goal' ? 'Converted to goal.' : 'Converted to task.'
+
+    void onUpdateTask(contextMenu.task.id, { type: nextType }, successMessage)
     setContextMenu(null)
   }, [contextMenu, onUpdateTask])
 
@@ -533,12 +547,15 @@ function TaskTable({
           <button type="button" onClick={() => void handleContextDuplicate()}>
             Duplicate
           </button>
+          <button type="button" onClick={handleContextConvertTaskType}>
+            {contextMenu.task.type === 'task' ? 'Convert to Goal' : 'Convert to Task'}
+          </button>
           <button type="button" className="task-context-menu__danger" onClick={() => void handleContextDelete()}>
             Delete
           </button>
           {contextMenu.task.parent_task_id !== null ? (
             <button type="button" onClick={handleContextConvertToTask}>
-              Convert to Task
+              Convert to Independent Task
             </button>
           ) : (
             (contextMenu.task.status === 'todo' || contextMenu.task.status === 'in_progress') && (

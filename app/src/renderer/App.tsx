@@ -598,6 +598,7 @@ function App() {
             viewType={viewType}
             tasks={displayedTasks}
             lastCreatedTaskId={lastCreatedTaskId}
+            showCompletedTasks={showCompletedTasks}
             projects={projects}
             categories={categories}
             tags={tags}

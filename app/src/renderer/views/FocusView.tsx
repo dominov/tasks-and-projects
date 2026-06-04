@@ -4,10 +4,10 @@ import type { Project, TaskStatus, TaskUpdatePayload, TaskWithRelations } from '
 import type { QuickCreateOptions } from '../components/ViewManager'
 
 type SortBy = 'priority' | 'project' | 'story_points'
-type TaskParentRelation = 'GOAL' | 'PARENT TASK' | 'NONE'
 
 interface FocusViewProps {
   tasks: TaskWithRelations[]
+  showCompletedTasks: boolean
   projects: Project[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
@@ -66,7 +66,7 @@ function formatFriendlyDate(dateString: string | null): string {
   return format(date, 'd MMM')
 }
 
-function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask, onUpdateTask, projectId }: FocusViewProps) {
+function FocusView({ tasks, showCompletedTasks, projects, onSelectTask, selectedTaskId, onCreateTask, onUpdateTask, projectId }: FocusViewProps) {
   const [sortBy, setSortBy] = useState<SortBy>('priority')
   const [addingStatus, setAddingStatus] = useState<'todo' | 'in_progress' | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -100,8 +100,8 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
   )
 
   const doneToday = useMemo(
-    () => sortTasks(todayTasks.filter((t) => t.status === 'done'), sortBy),
-    [todayTasks, sortBy],
+    () => (showCompletedTasks ? sortTasks(todayTasks.filter((t) => t.status === 'done'), sortBy) : []),
+    [showCompletedTasks, todayTasks, sortBy],
   )
 
   const sortedOverdue = useMemo(
@@ -125,16 +125,16 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
     return map
   }, [tasks])
 
-  const taskRelationMap = useMemo(() => {
-    const map = new Map<number, TaskParentRelation>()
+  const taskParentTitleMap = useMemo(() => {
+    const map = new Map<number, string | null>()
     for (const task of activeTasks) {
       if (!task.parent_task_id) {
-        map.set(task.id, 'NONE')
+        map.set(task.id, null)
         continue
       }
 
       const parentTask = taskById.get(task.parent_task_id)
-      map.set(task.id, parentTask?.type === 'goal' ? 'GOAL' : 'PARENT TASK')
+      map.set(task.id, parentTask?.title ?? null)
     }
     return map
   }, [activeTasks, taskById])
@@ -264,7 +264,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     showPulse
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
-                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
+                    parentTitle={taskParentTitleMap.get(task.id) ?? null}
                   />
                 ))}
                 <div className="focus-add-task-wrap">
@@ -321,7 +321,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     onSelect={onSelectTask}
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
-                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
+                    parentTitle={taskParentTitleMap.get(task.id) ?? null}
                   />
                 ))}
                 <div className="focus-add-task-wrap">
@@ -361,29 +361,33 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
               <div className="focus-kanban__col-count">{todoToday.length}</div>
             </div>
 
-            {/* Done */}
-            <div className="focus-kanban__col">
-              <div className="focus-kanban__col-header focus-kanban__col-header--done">
-                <CheckIcon />
-                <span>DONE</span>
-              </div>
-              <div className="focus-kanban__col-body">
-                {doneToday.length === 0 && <EmptyState text="Complete tasks to see them here" />}
-                {doneToday.map((task) => (
-                  <FocusCard
-                    key={task.id}
-                    task={task}
-                    selected={selectedTaskId === task.id}
-                    projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
-                    onSelect={onSelectTask}
-                    onMoveStatus={handleMoveTaskStatus}
-                    statusUpdating={updatingTaskIds.has(task.id)}
-                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
-                  />
-                ))}
-              </div>
-              <div className="focus-kanban__col-count">{doneToday.length}</div>
-            </div>
+            {showCompletedTasks && (
+              <>
+                {/* Done */}
+                <div className="focus-kanban__col">
+                  <div className="focus-kanban__col-header focus-kanban__col-header--done">
+                    <CheckIcon />
+                    <span>DONE</span>
+                  </div>
+                  <div className="focus-kanban__col-body">
+                    {doneToday.length === 0 && <EmptyState text="Complete tasks to see them here" />}
+                    {doneToday.map((task) => (
+                      <FocusCard
+                        key={task.id}
+                        task={task}
+                        selected={selectedTaskId === task.id}
+                        projectColor={task.project_id ? projectColorMap.get(task.project_id) : undefined}
+                        onSelect={onSelectTask}
+                        onMoveStatus={handleMoveTaskStatus}
+                        statusUpdating={updatingTaskIds.has(task.id)}
+                        parentTitle={taskParentTitleMap.get(task.id) ?? null}
+                      />
+                    ))}
+                  </div>
+                  <div className="focus-kanban__col-count">{doneToday.length}</div>
+                </div>
+              </>
+            )}
           </div>
           </section>
 
@@ -405,7 +409,7 @@ function FocusView({ tasks, projects, onSelectTask, selectedTaskId, onCreateTask
                     overdue
                     onMoveStatus={handleMoveTaskStatus}
                     statusUpdating={updatingTaskIds.has(task.id)}
-                    relation={taskRelationMap.get(task.id) ?? 'NONE'}
+                    parentTitle={taskParentTitleMap.get(task.id) ?? null}
                   />
                 ))}
               </div>
@@ -423,7 +427,7 @@ interface FocusCardProps {
   task: TaskWithRelations
   selected: boolean
   projectColor?: string
-  relation: TaskParentRelation
+  parentTitle: string | null
   onSelect: (taskId: number) => void
   onMoveStatus: (task: TaskWithRelations, direction: 'prev' | 'next') => Promise<void>
   statusUpdating: boolean
@@ -443,12 +447,13 @@ function getPriorityTone(priority: number): 'low' | 'medium' | 'high' {
   return 'medium'
 }
 
-function FocusCard({ task, selected, projectColor, relation, onSelect, onMoveStatus, statusUpdating, overdue, showPulse }: FocusCardProps) {
+function FocusCard({ task, selected, projectColor, parentTitle, onSelect, onMoveStatus, statusUpdating, overdue, showPulse }: FocusCardProps) {
   const tags = task.tag_names ? task.tag_names.split(',').map((t) => t.trim()) : []
   const categoryIcon = getCategoryIcon(task.category_name)
   const canMovePrev = task.status !== 'todo'
   const canMoveNext = task.status !== 'done'
   const priorityTone = getPriorityTone(task.priority)
+  const isInProgress = task.status === 'in_progress'
 
   return (
     <div
@@ -458,6 +463,8 @@ function FocusCard({ task, selected, projectColor, relation, onSelect, onMoveSta
       className={[
         'focus-card',
         `weekly-task--priority-${priorityTone}`,
+        isInProgress && 'focus-card--in-progress',
+        task.status === 'done' && 'focus-card--done',
         selected && 'focus-card--selected',
         overdue && 'focus-card--overdue',
         showPulse && 'focus-card--pulse',
@@ -517,33 +524,61 @@ function FocusCard({ task, selected, projectColor, relation, onSelect, onMoveSta
 
       {/* Footer: attributes */}
       <div className="focus-card__footer">
-        <span className="focus-card__relation-field">
-          <span className="focus-card__relation-label">Part of:</span>
-          <span className={[
-            'focus-card__relation-value',
-            relation === 'GOAL' && 'focus-card__relation-value--goal',
-            relation === 'PARENT TASK' && 'focus-card__relation-value--parent',
-          ].filter(Boolean).join(' ')}>
-            {relation}
-          </span>
-        </span>
-        {task.project_name && (
-          <span
-            className="focus-card__project"
-            style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
-          >
-            {task.project_name}
-          </span>
+        {isInProgress ? (
+          <>
+            <div className="focus-card__line focus-card__line--project-parent">
+              {task.project_name && (
+                <span
+                  className="focus-card__project"
+                  style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
+                >
+                  {task.project_name}
+                </span>
+              )}
+              {parentTitle && (
+                <span className="focus-card__relation-field">
+                  <span className="focus-card__relation-value">{parentTitle}</span>
+                </span>
+              )}
+            </div>
+            <div className="focus-card__line focus-card__line--category-tags">
+              {task.category_name && (
+                <span className="focus-card__category">
+                  <CategoryIconSvg name={categoryIcon} />
+                  {task.category_name}
+                </span>
+              )}
+              {tags.map((tag) => (
+                <span key={tag} className="focus-card__tag">#{tag}</span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="focus-card__line">
+            {task.project_name && (
+              <span
+                className="focus-card__project"
+                style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
+              >
+                {task.project_name}
+              </span>
+            )}
+            {parentTitle && (
+              <span className="focus-card__relation-field">
+                <span className="focus-card__relation-value">{parentTitle}</span>
+              </span>
+            )}
+            {task.category_name && (
+              <span className="focus-card__category">
+                <CategoryIconSvg name={categoryIcon} />
+                {task.category_name}
+              </span>
+            )}
+            {tags.map((tag) => (
+              <span key={tag} className="focus-card__tag">#{tag}</span>
+            ))}
+          </div>
         )}
-        {task.category_name && (
-          <span className="focus-card__category">
-            <CategoryIconSvg name={categoryIcon} />
-            {task.category_name}
-          </span>
-        )}
-        {tags.map((tag) => (
-          <span key={tag} className="focus-card__tag">#{tag}</span>
-        ))}
       </div>
     </div>
   )
