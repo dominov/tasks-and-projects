@@ -28,8 +28,8 @@ const HEADER_HEIGHT = 56
 const DEFAULT_SIDE_PANEL_WIDTH = 220
 const MIN_SIDE_PANEL_WIDTH = 180
 const MAX_SIDE_PANEL_WIDTH = 560
-const DAYS_BEFORE_TODAY = 7
-const DAYS_AFTER_LATEST_TASK = 3
+const DAYS_BEFORE_TODAY = 0
+const DAYS_AFTER_LATEST_TASK = 10
 const CLICK_SUPPRESSION_MS = 250
 
 interface DayCell {
@@ -91,7 +91,7 @@ function GanttView({
   const [panelResize, setPanelResize] = useState<PanelResizeState | null>(null)
   const [sidePanelWidth, setSidePanelWidth] = useState(DEFAULT_SIDE_PANEL_WIDTH)
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
-  const [groupBy, setGroupBy] = useState<GroupBy>('status')
+  const [groupBy, setGroupBy] = useState<GroupBy>('project')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const suppressedClickRef = useRef<{ taskId: number | null; until: number }>({
     taskId: null,

@@ -43,6 +43,7 @@ export interface Task {
   end_time: string | null
   type: TaskType
   tracking_only: number
+  completed_at: string | null
 }
 
 export interface TaskWithRelations extends Task {

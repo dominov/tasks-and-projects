@@ -78,6 +78,7 @@ async function ensureDatabaseReady(): Promise<AppDatabase> {
   applyMigrations(database)
   ensureTaskMetadataColumns(database)
   ensureTrackingOnlyColumn(database)
+  ensureCompletedAtColumn(database)
   ensureCategoryMetadataColumns(database)
   return database
 }
@@ -121,6 +122,7 @@ function registerIpcHandlers(database: AppDatabase): void {
         t.end_time,
         t.type,
         t.tracking_only,
+        t.completed_at,
         p.name AS project_name,
         c.name AS category_name,
         GROUP_CONCAT(DISTINCT tt.tag_id) AS tag_ids,
@@ -208,6 +210,9 @@ function registerIpcHandlers(database: AppDatabase): void {
       setClauses.push(`status = '${payload.status}'`)
       if (payload.status === 'done' && currentTask.status !== 'done') {
         statusChangedToDone = true
+        setClauses.push("completed_at = datetime('now')")
+      } else if (payload.status !== 'done' && currentTask.status === 'done') {
+        setClauses.push('completed_at = NULL')
       }
     }
 
@@ -1025,6 +1030,22 @@ function ensureTrackingOnlyColumn(database: AppDatabase): void {
   }
 }
 
+function ensureCompletedAtColumn(database: AppDatabase): void {
+  const columns = database.query<{ name: string }>('PRAGMA table_info(tasks);')
+  const hasCompletedAt = columns.some((column) => column.name === 'completed_at')
+
+  if (!hasCompletedAt) {
+    database.execute('ALTER TABLE tasks ADD COLUMN completed_at TEXT;')
+  }
+
+  // Backfill any historical 'done' tasks so they appear in the Completed view.
+  // Prefer the original due date; fall back to created_at; else stamp now so they
+  // remain queryable by date.
+  database.execute(
+    "UPDATE tasks SET completed_at = COALESCE(end_date, created_at, datetime('now')) WHERE status = 'done' AND completed_at IS NULL;",
+  )
+}
+
 function ensureCategoryMetadataColumns(database: AppDatabase): void {
   const columns = database.query<{ name: string }>("PRAGMA table_info('categories');")
   const hasColorColumn = columns.some((column) => column.name === 'color')
@@ -1538,6 +1559,8 @@ app.whenReady()
   })
   .catch((error: unknown) => {
     console.error('Failed to start Electron application', error)
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    dialog.showErrorBox('Error starting Personal Task Management', detail)
     app.quit()
   })
 

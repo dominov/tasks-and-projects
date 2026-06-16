@@ -46,7 +46,7 @@ function App() {
   const displayedTasks = useMemo(() => {
     let result = filteredTasks
 
-    if (!showCompletedTasks && viewType !== 'focus') {
+    if (!showCompletedTasks && viewType !== 'focus' && viewType !== 'completed') {
       result = result.filter((task) => task.status !== 'done')
     }
 

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import type { Category, Project, Tag, TaskStatus, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
 import TableView from '../views/TableView'
 import FocusView from '../views/FocusView'
+import CompletedView from '../views/CompletedView'
 import CreateCategoryView from '../views/CreateCategoryView'
 import CreateProjectView from '../views/CreateProjectView'
 import CreateTagView from '../views/CreateTagView'
@@ -12,6 +13,7 @@ export type ViewType =
   | 'focus'
   | 'calendar'
   | 'gantt'
+  | 'completed'
   | 'create-project'
   | 'create-tag'
   | 'create-category'
@@ -137,6 +139,25 @@ function ViewManager({
         onCreateTask={onCreateTask}
         projectId={projectId}
         onUpdateTask={onUpdateTask}
+      />
+    )
+  }
+
+  if (viewType === 'completed') {
+    return (
+      <CompletedView
+        tasks={tasks}
+        projects={projects}
+        categories={categories}
+        tags={tags}
+        onSelectTask={onSelectTask}
+        selectedTaskId={selectedTaskId}
+        projectId={projectId}
+        categoryId={categoryId}
+        tagId={tagId}
+        onCreateTask={onCreateTask}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={onDeleteTask}
       />
     )
   }

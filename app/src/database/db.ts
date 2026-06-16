@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const require = createRequire(import.meta.url)
 
-const bundledMigrationsPath = path.join(__dirname, 'migrations')
+const bundledMigrationsPath = path.resolve(__dirname, '../src/database/migrations')
 const sourceMigrationsPath = path.resolve(process.cwd(), 'src', 'database', 'migrations')
 
 let sqlJsRuntimePromise: Promise<SqlJsStatic> | null = null

@@ -56,6 +56,7 @@ const viewMenu: Array<{ id: ViewType; label: string; icon: IconName }> = [
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
   { id: 'goals', label: 'Goals', icon: 'target' },
   { id: 'gantt', label: 'Gantt', icon: 'chart' },
+  { id: 'completed', label: 'Completed', icon: 'check-square' },
 ]
 
 function SidebarIcon({ name, className }: { name: IconName; className?: string }) {

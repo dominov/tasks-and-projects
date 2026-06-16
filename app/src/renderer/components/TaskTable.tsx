@@ -39,6 +39,7 @@ interface TaskTableProps {
   onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
   onDeleteTask: (taskId: number) => Promise<void>
   onCreateGoalSubtask?: (goalId: number, title: string) => Promise<void>
+  readOnly?: boolean
 }
 
 function TaskTable({
@@ -57,6 +58,7 @@ function TaskTable({
   onUpdateTask,
   onDeleteTask,
   onCreateGoalSubtask,
+  readOnly = false,
 }: TaskTableProps) {
   const isGoalView = createType === 'goal'
   const groupByStorageKey = isGoalView ? GOAL_GROUP_BY_STORAGE_KEY : TABLE_GROUP_BY_STORAGE_KEY
@@ -348,7 +350,8 @@ function TaskTable({
 
   return (
     <div className="table-wrap">
-      <div className={`quick-add-toolbar ${isGoalView ? 'quick-add-toolbar--goal' : ''}`}>
+      {!readOnly && (
+        <div className={`quick-add-toolbar ${isGoalView ? 'quick-add-toolbar--goal' : ''}`}>
         <input
           ref={quickAddInputRef}
           type="text"
@@ -406,7 +409,8 @@ function TaskTable({
         >
           Create
         </button>
-      </div>
+        </div>
+      )}
 
       <div className="table-toolbar">
         <label htmlFor="group-by-select">Group by:</label>
@@ -452,7 +456,7 @@ function TaskTable({
                   selectedTaskId,
                   onSelectTask,
                   isGoalView,
-                  createType === 'goal',
+                  !readOnly && createType === 'goal',
                   goalSubtaskTitles,
                   setGoalSubtaskTitles,
                   creatingGoalSubtaskId,
@@ -505,7 +509,7 @@ function TaskTable({
                       selectedTaskId,
                       onSelectTask,
                       isGoalView,
-                      createType === 'goal',
+                      !readOnly && createType === 'goal',
                       goalSubtaskTitles,
                       setGoalSubtaskTitles,
                       creatingGoalSubtaskId,
