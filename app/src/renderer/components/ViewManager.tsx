@@ -191,6 +191,7 @@ function ViewManager({
           projects={projects}
           onSelectTask={onSelectTask}
           selectedTaskId={selectedTaskId}
+          onCreateTask={onCreateTask}
           onUpdateTask={onUpdateTask}
           onShiftTasks={onShiftTasks}
           presentationMode={presentationMode}

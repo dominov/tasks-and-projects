@@ -509,6 +509,17 @@ function FocusCard({ task, selected, projectColor, parentTitle, onSelect, onMove
         </button>
       )}
 
+      {task.project_name && (
+        <div className="focus-card__project-row">
+          <span
+            className="focus-card__project"
+            style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
+          >
+            {task.project_name}
+          </span>
+        </div>
+      )}
+
       {/* Top row: title + SP */}
       <div className="focus-card__top">
         <div className="focus-card__title-wrap">
@@ -527,14 +538,6 @@ function FocusCard({ task, selected, projectColor, parentTitle, onSelect, onMove
         {isInProgress ? (
           <>
             <div className="focus-card__line focus-card__line--project-parent">
-              {task.project_name && (
-                <span
-                  className="focus-card__project"
-                  style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
-                >
-                  {task.project_name}
-                </span>
-              )}
               {parentTitle && (
                 <span className="focus-card__relation-field">
                   <span className="focus-card__relation-value">{parentTitle}</span>
@@ -555,14 +558,6 @@ function FocusCard({ task, selected, projectColor, parentTitle, onSelect, onMove
           </>
         ) : (
           <div className="focus-card__line">
-            {task.project_name && (
-              <span
-                className="focus-card__project"
-                style={projectColor ? { background: projectColor, color: '#fff' } : undefined}
-              >
-                {task.project_name}
-              </span>
-            )}
             {parentTitle && (
               <span className="focus-card__relation-field">
                 <span className="focus-card__relation-value">{parentTitle}</span>

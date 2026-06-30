@@ -189,6 +189,8 @@ function registerIpcHandlers(database: AppDatabase): void {
       && (nextRecurrence !== currentTask.recurrence || (nextRecurrenceRule ?? null) !== (currentTask.recurrence_rule ?? null))
     const previousParentTaskId = currentTask.parent_task_id
     let nextParentTaskId = currentTask.parent_task_id
+    let nextProjectId = currentTask.project_id
+    let projectChanged = false
 
     if (typeof payload.title === 'string') {
       setClauses.push(`title = '${escapeSqlString(payload.title)}'`)
@@ -271,6 +273,7 @@ function registerIpcHandlers(database: AppDatabase): void {
     if (payload.project_id !== undefined) {
       if (payload.project_id === null) {
         setClauses.push('project_id = NULL')
+        nextProjectId = null
       } else {
         const projectId = Number(payload.project_id)
 
@@ -279,7 +282,10 @@ function registerIpcHandlers(database: AppDatabase): void {
         }
 
         setClauses.push(`project_id = ${projectId}`)
+        nextProjectId = projectId
       }
+
+      projectChanged = nextProjectId !== currentTask.project_id
     }
 
     if (payload.parent_task_id !== undefined) {
@@ -362,6 +368,19 @@ function registerIpcHandlers(database: AppDatabase): void {
 
     if (statements.length > 0) {
       database.transaction(statements)
+    }
+
+    if (currentTask.type === 'goal' && projectChanged) {
+      const descendantIds = getDescendantTaskIds(database, taskId)
+
+      if (descendantIds.length > 0) {
+        const idList = descendantIds.join(', ')
+        database.execute(`
+          UPDATE tasks
+          SET project_id = ${nextProjectId === null ? 'NULL' : nextProjectId}
+          WHERE id IN (${idList});
+        `)
+      }
     }
 
     // After transaction, handle logic
@@ -483,6 +502,7 @@ function registerIpcHandlers(database: AppDatabase): void {
     }
 
     let projectId: number | null = payload.project_id ?? null
+    let categoryId: number | null = payload.category_id ?? null
 
     if (payload.parent_task_id !== undefined && payload.parent_task_id !== null) {
       const parentTaskId = Number(payload.parent_task_id)
@@ -491,8 +511,8 @@ function registerIpcHandlers(database: AppDatabase): void {
         throw new Error('Invalid parent task ID')
       }
 
-      const parentTask = database.first<{ project_id: number | null }>(
-        `SELECT project_id FROM tasks WHERE id = ${parentTaskId} LIMIT 1;`,
+      const parentTask = database.first<{ project_id: number | null; category_id: number | null }>(
+        `SELECT project_id, category_id FROM tasks WHERE id = ${parentTaskId} LIMIT 1;`,
       )
 
       if (!parentTask) {
@@ -500,9 +520,8 @@ function registerIpcHandlers(database: AppDatabase): void {
       }
 
       projectId = parentTask.project_id
+      categoryId = parentTask.category_id
     }
-
-    let categoryId: number | null = payload.category_id ?? null
 
     let priority = payload.priority ?? 2
 
@@ -1297,6 +1316,23 @@ function getParentTaskIdsForTaskIds(database: AppDatabase, taskIds: number[]): n
   return rows
     .map((row) => row.parent_task_id)
     .filter((parentId): parentId is number => Number.isInteger(parentId) && parentId > 0)
+}
+
+function getDescendantTaskIds(database: AppDatabase, rootTaskId: number): number[] {
+  const rows = database.query<{ id: number }>(`
+    WITH RECURSIVE descendant_tasks(id) AS (
+      SELECT id
+      FROM tasks
+      WHERE parent_task_id = ${rootTaskId}
+      UNION ALL
+      SELECT t.id
+      FROM tasks t
+      JOIN descendant_tasks d ON t.parent_task_id = d.id
+    )
+    SELECT id FROM descendant_tasks;
+  `)
+
+  return rows.map((row) => row.id)
 }
 
 function deleteTasksByIds(database: AppDatabase, taskIds: number[]): void {

@@ -4,6 +4,7 @@ import {
   toIsoDate,
 } from '../../common/businessDays'
 import type { Project, TaskUpdatePayload, TaskWithRelations } from '../../common/types'
+import type { QuickCreateOptions } from '../components/ViewManager'
 import { getGroupLabel, getGroupLabelHeading, type GroupBy } from '../utils/taskGrouping'
 
 interface GanttViewProps {
@@ -11,6 +12,7 @@ interface GanttViewProps {
   projects: Project[]
   onSelectTask: (taskId: number) => void
   selectedTaskId: number | null
+  onCreateTask: (title: string, type?: 'task' | 'goal', options?: QuickCreateOptions) => Promise<number | null>
   onUpdateTask: (taskId: number, payload: TaskUpdatePayload, successMessage: string) => Promise<void>
   onShiftTasks: (
     updates: Array<{ taskId: number; payload: TaskUpdatePayload }>,
@@ -81,6 +83,7 @@ function GanttView({
   projects,
   onSelectTask,
   selectedTaskId,
+  onCreateTask,
   onUpdateTask,
   onShiftTasks,
   presentationMode,
@@ -92,6 +95,8 @@ function GanttView({
   const [sidePanelWidth, setSidePanelWidth] = useState(DEFAULT_SIDE_PANEL_WIDTH)
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
   const [groupBy, setGroupBy] = useState<GroupBy>('project')
+  const [newGoalTitle, setNewGoalTitle] = useState('')
+  const [creatingGoal, setCreatingGoal] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const suppressedClickRef = useRef<{ taskId: number | null; until: number }>({
     taskId: null,
@@ -531,6 +536,36 @@ function GanttView({
     }))
   }
 
+  const handleCreateGoal = useCallback(async () => {
+    const trimmedTitle = newGoalTitle.trim()
+
+    if (!trimmedTitle || creatingGoal) {
+      return
+    }
+
+    setCreatingGoal(true)
+
+    try {
+      const todayIsoDate = toIsoDate(new Date())
+      await onCreateTask(trimmedTitle, 'goal', {
+        startDate: todayIsoDate,
+        endDate: todayIsoDate,
+      })
+      setNewGoalTitle('')
+    } finally {
+      setCreatingGoal(false)
+    }
+  }, [creatingGoal, newGoalTitle, onCreateTask])
+
+  const handleNewGoalKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        void handleCreateGoal()
+      }
+    },
+    [handleCreateGoal],
+  )
+
   return (
     <section
       className={`gantt-view${presentationMode ? ' gantt-view--presentation' : ''}`}
@@ -555,6 +590,26 @@ function GanttView({
               <option value="priority">Priority</option>
             </select>
           </div>
+        </div>
+        <div className="gantt-goal-quick-add" aria-label="Quick add goal from timeline">
+          <input
+            type="text"
+            className="quick-add-input"
+            placeholder="Add goal title..."
+            value={newGoalTitle}
+            onChange={(event) => setNewGoalTitle(event.target.value)}
+            onKeyDown={handleNewGoalKeyDown}
+            readOnly={creatingGoal}
+            aria-busy={creatingGoal}
+          />
+          <button
+            type="button"
+            className="new-task-add"
+            onClick={() => void handleCreateGoal()}
+            disabled={!newGoalTitle.trim() || creatingGoal}
+          >
+            Add goal
+          </button>
         </div>
         <button
           type="button"

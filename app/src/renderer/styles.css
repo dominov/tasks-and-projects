@@ -230,12 +230,12 @@
 }
 
 .weekly-task-goal-subtitle {
-font-size: 0.63rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    opacity: 0.85;
-    font-style: italic;
-    color: palevioletred;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  opacity: 0.95;
+  font-style: italic;
+  color: #be185d;
 }
 
 .weekly-multi-day-task .weekly-task-goal-subtitle {
@@ -2583,6 +2583,12 @@ tbody tr.task-row--new:hover td {
   border-top: 1px solid #f1f5f9;
 }
 
+.focus-card__project-row {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.15rem;
+}
+
 .focus-card__line {
   display: flex;
   flex-wrap: wrap;
@@ -2822,6 +2828,19 @@ tbody tr.task-row--new:hover td {
   color: #334155;
 }
 
+.gantt-goal-quick-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  min-width: 18rem;
+}
+
+.gantt-goal-quick-add .quick-add-input {
+  min-width: 14rem;
+  width: 100%;
+}
+
 .gantt-group-select {
   min-width: 136px;
   border: 1px solid #cbd5e1;
@@ -2873,6 +2892,14 @@ tbody tr.task-row--new:hover td {
 .gantt-presentation-toggle[aria-pressed='true'] {
   background: #1d4ed8;
   border-color: #1d4ed8;
+}
+
+@media (max-width: 960px) {
+  .gantt-goal-quick-add {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 .gantt-scroll {
